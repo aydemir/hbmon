@@ -16,3 +16,10 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
 
 - Task kanban (`tasks/`), jq-sorgulanabilir `index.json`lar ve `.codegraph/`
   indexi opencode-plugins konvansiyonuyla eklendi.
+
+## 2026-09-09 — Uyandırma kararı (TASK-005)
+
+- Gerçek async push alıcısız imkânsız; plugin ise hedefi deler.
+- Karar: `wait --until` — bloklanan çağrının izlenen sinyalde erken
+  dönüşü. Polling (`status`/`log_tail`) korunur, `until` yoksa davranış
+  değişmez. Dürüst adıyla senkron çoğullamalı bekleme.

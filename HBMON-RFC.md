@@ -352,6 +352,12 @@ Build bitene kadar bloklanır. LLM'in "şimdi sorma, hazır olunca söyle" demes
 - Build erken biterse hemen döner
 - 500ms poll aralığı ile süreç ağacı kontrol edilir
 
+**Erken dönüş (`until`):** `until` listesi verilirse (`done`, `dep_missing`,
+`stall_suspect`, `oom_suspect`, …) çağrı ilk eşleşen sinyalde `woke_on`
+alanıyla döner; polling ve harness eklentisi gerekmez. Bu senkron
+çoğullamalı beklemedir, async push değil (`until` yoksa yalnızca terminal
+state'lerde dönülür).
+
 ##### Operation: `kill`
 
 ```json

@@ -46,5 +46,17 @@
     "created": "2026-09-09",
     "updated": "2026-09-09",
     "file": "tasks/todo/TASK-004-plugin-migrasyonu.md"
+  },
+  {
+    "id": "TASK-005",
+    "title": "wait --until (erken dönüş, eklentisiz uyandırma)",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["ipc", "wait", "protocol"],
+    "depends_on": [],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/done/TASK-005-wait-until.md"
   }
 ]

@@ -625,33 +625,59 @@ fn dispatch(req: Value, shared: &Shared, logger_path: &Path) -> Value {
                 .and_then(|v| v.as_f64())
                 .unwrap_or(300.0);
             let poll_ms = req.get("poll_ms").and_then(|v| v.as_u64()).unwrap_or(500);
+            // until yoksa boş liste → yalnızca terminal state'ler (eski davranış).
+            let until: Vec<String> = req
+                .get("until")
+                .and_then(|v| v.as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .filter(|v: &Vec<String>| !v.is_empty())
+                .unwrap_or_default();
             let deadline = Instant::now() + Duration::from_secs_f64(timeout.max(1.0));
             loop {
                 let st = *shared.state.lock().unwrap();
-                if matches!(
-                    st,
-                    State::Done | State::Failed | State::DepMissing | State::OomKilled | State::Timeout
-                ) {
-                    let code = shared.build_code.lock().unwrap().unwrap_or(1);
-                    let dur = shared
-                        .exit_secs
-                        .lock()
-                        .unwrap()
-                        .map(|e| e - shared.started_secs)
-                        .unwrap_or(0.0);
-                    let mut m = serde_json::Map::new();
-                    m.insert("state".to_string(), json!(st.as_str()));
-                    m.insert("code".to_string(), json!(code));
-                    m.insert("duration_sec".to_string(), json!(dur));
-                    m.insert(
-                        "exit_event".to_string(),
-                        shared.last_event.lock().unwrap().clone(),
+                let dep = shared.dep_info.lock().unwrap().is_some();
+                let oom = shared.oom_info.lock().unwrap().is_some();
+                if let Some(woke) = wait_match(st, &until, dep, oom) {
+                    let terminal = matches!(
+                        st,
+                        State::Done
+                            | State::Failed
+                            | State::DepMissing
+                            | State::OomKilled
+                            | State::Timeout
                     );
+                    if terminal {
+                        let code = shared.build_code.lock().unwrap().unwrap_or(1);
+                        let dur = shared
+                            .exit_secs
+                            .lock()
+                            .unwrap()
+                            .map(|e| e - shared.started_secs)
+                            .unwrap_or(0.0);
+                        let mut m = serde_json::Map::new();
+                        m.insert("state".to_string(), json!(st.as_str()));
+                        m.insert("code".to_string(), json!(code));
+                        m.insert("duration_sec".to_string(), json!(dur));
+                        m.insert(
+                            "exit_event".to_string(),
+                            shared.last_event.lock().unwrap().clone(),
+                        );
+                        m.insert("woke_on".to_string(), json!(woke));
+                        return ok_response(&id, m);
+                    }
+                    // Erken dönüş: anlık snapshot + hangi sinyal uyandırdı.
+                    let mut m = status_map(shared, logger_path);
+                    m.insert("woke_on".to_string(), json!(woke));
                     return ok_response(&id, m);
                 }
                 if Instant::now() >= deadline {
                     let mut m = status_map(shared, logger_path);
                     m.insert("timeout".to_string(), json!(true));
+                    m.insert("woke_on".to_string(), json!("timeout"));
                     return ok_response(&id, m);
                 }
                 std::thread::sleep(Duration::from_millis(poll_ms));
@@ -761,4 +787,94 @@ fn status_map(shared: &Shared, logger_path: &Path) -> serde_json::Map<String, Va
 
 fn status_snapshot(shared: &Shared, id: &str, logger_path: &Path) -> Value {
     ok_response(id, status_map(shared, logger_path))
+}
+
+/// `until` boşsa yalnızca terminal state'ler eşleşir (eski davranış).
+/// Doluysa listedeki ilk sinyal kazanır; ara sinyaller (stall/dep/oom)
+/// build bitmeden de eşleşebilir — erken dönüşün çekirdeği.
+/// Bilinmeyen adlar yok sayılır.
+fn wait_match(
+    state: State,
+    until: &[String],
+    dep_hit: bool,
+    oom_hit: bool,
+) -> Option<String> {
+    if until.is_empty() {
+        if matches!(
+            state,
+            State::Done | State::Failed | State::DepMissing | State::OomKilled | State::Timeout
+        ) {
+            return Some(state.as_str().to_string());
+        }
+        return None;
+    }
+    for want in until {
+        let hit = match want.as_str() {
+            "done" => state == State::Done,
+            "failed" => state == State::Failed,
+            "timeout" => state == State::Timeout,
+            "dep_missing" => dep_hit || state == State::DepMissing,
+            "stall_suspect" | "stalled" => state == State::Stalled,
+            "oom_suspect" | "oom_killed" => oom_hit || state == State::OomKilled,
+            _ => false,
+        };
+        if hit {
+            return Some(want.clone());
+        }
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_wakes_only_on_terminal() {
+        let empty: Vec<String> = vec![];
+        assert_eq!(
+            wait_match(State::Done, &empty, false, false),
+            Some("done".to_string())
+        );
+        assert_eq!(wait_match(State::Running, &empty, false, false), None);
+        // Ara sinyal bile olsa boş until uyandırmaz (eski davranış).
+        assert_eq!(wait_match(State::Running, &empty, true, true), None);
+    }
+
+    #[test]
+    fn dep_signal_wakes_early() {
+        let u = vec!["dep_missing".to_string()];
+        assert_eq!(
+            wait_match(State::Running, &u, true, false),
+            Some("dep_missing".to_string())
+        );
+        assert_eq!(wait_match(State::Running, &u, false, false), None);
+    }
+
+    #[test]
+    fn stall_and_oom_wake_early() {
+        assert_eq!(
+            wait_match(
+                State::Stalled,
+                &["stall_suspect".to_string()],
+                false,
+                false
+            ),
+            Some("stall_suspect".to_string())
+        );
+        assert_eq!(
+            wait_match(State::Running, &["oom_suspect".to_string()], false, true),
+            Some("oom_suspect".to_string())
+        );
+    }
+
+    #[test]
+    fn unknown_names_ignored_until_order_wins() {
+        let u = vec!["nope".to_string(), "failed".to_string()];
+        assert_eq!(
+            wait_match(State::Failed, &u, false, false),
+            Some("failed".to_string())
+        );
+        assert_eq!(wait_match(State::Running, &u, false, false), None);
+    }
 }

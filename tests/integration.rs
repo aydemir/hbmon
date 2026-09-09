@@ -157,3 +157,94 @@ fn exec_json_summary_on_stderr() {
     assert_eq!(v["code"], 1);
     assert_eq!(v["raw_code"], 3);
 }
+
+#[test]
+fn wait_until_dep_missing_returns_early() {
+    let id = uuid("until-dep");
+    let sock = sock_for(&id);
+    let s = sock.to_str().unwrap().to_string();
+    let out = hbmon()
+        .args([
+            "watch",
+            "--detach",
+            "--uuid",
+            &id,
+            "--",
+            "sh",
+            "-c",
+            "echo \"Cannot find module 'x'\" >&2; sleep 30",
+        ])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+    let w = hbmon()
+        .args([
+            "wait",
+            "--sock",
+            &s,
+            "--timeout",
+            "60",
+            "--until",
+            "dep_missing,stall_suspect,done",
+        ])
+        .timeout(Duration::from_secs(90))
+        .output()
+        .unwrap();
+    // Erken dönüşte code alanı yok → exit 0; ajan woke_on'a bakar.
+    assert!(w.status.success());
+    let wv: Value = serde_json::from_slice(&w.stdout).unwrap();
+    assert_eq!(wv["woke_on"], "dep_missing");
+    // Temizlik: uykudaki build + daemon.
+    hbmon()
+        .args(["kill", "--sock", &s, "--signal", "TERM"])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}
+
+#[test]
+fn wait_until_stall_suspect_returns_early() {
+    let id = uuid("until-stall");
+    let sock = sock_for(&id);
+    let s = sock.to_str().unwrap().to_string();
+    let out = hbmon()
+        .args(["watch", "--detach", "--uuid", &id, "--", "sleep", "45"])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+    let start = std::time::Instant::now();
+    let w = hbmon()
+        .args([
+            "wait",
+            "--sock",
+            &s,
+            "--timeout",
+            "120",
+            "--until",
+            "stall_suspect",
+        ])
+        .timeout(Duration::from_secs(150))
+        .output()
+        .unwrap();
+    let el = start.elapsed().as_secs();
+    assert!(w.status.success());
+    let wv: Value = serde_json::from_slice(&w.stdout).unwrap();
+    assert_eq!(wv["woke_on"], "stall_suspect");
+    assert_eq!(wv["state"], "stalled");
+    // Bitiş 45s'deydi; erken dönüldüğünün kanıtı.
+    assert!(el < 45, "erken donmeliydi, {}s surdu", el);
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}

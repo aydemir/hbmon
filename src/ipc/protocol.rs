@@ -17,6 +17,11 @@ pub struct Request {
     pub n: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub force: Option<bool>,
+    /// wait: erken dönüş için izlenecek sinyaller
+    /// (done, dep_missing, stall_suspect, oom_suspect, …).
+    /// Yoksa yalnızca terminal state'lerde dönülür (eski davranış).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub until: Option<Vec<String>>,
 }
 
 impl Request {
@@ -30,6 +35,7 @@ impl Request {
             signal: None,
             n: None,
             force: None,
+            until: None,
         }
     }
 }
