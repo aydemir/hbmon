@@ -8,19 +8,19 @@
 
 /// Parent'tan kop, daemon bağlamına geç.
 ///
-/// Unix: double-fork + setsid (dönerse daemon'dur).
-/// Windows: kendini `--detach` bayrağı düşürülmüş argv ile detached
-/// yeniden-spawn eder, parent hemen `exit(0)` döner (dönmez).
-/// Handshake parent'ta ZATEN basılmıştır; child cwd'yi inherit eder
-/// (build workdir'i korunur) ve `run_daemon`'u foreground koşar.
-pub fn detach() -> Result<(), String> {
+/// `uuid`: bu monitorün kimliği. Unix'te kullanılmaz (fork aynı belleği
+/// taşır). Windows'ta re-exec argv'sine `--uuid` olarak GÖMÜLÜR —
+/// gömülmezse çocuk yeni uuid üretir, parent'ın bastığı handshake'taki
+/// sock boşa düşer (it3/LIVE ile yakalandı).
+pub fn detach(uuid: &str) -> Result<(), String> {
     #[cfg(unix)]
     {
+        let _ = uuid;
         unix_detach()
     }
     #[cfg(windows)]
     {
-        windows_detach()
+        windows_detach(uuid)
     }
 }
 
@@ -96,10 +96,11 @@ pub fn child_spawned(child: &std::process::Child) {
 }
 
 #[cfg(windows)]
-fn windows_detach() -> Result<(), String> {
+fn windows_detach(uuid: &str) -> Result<(), String> {
     use super::winffi;
     let exe = std::env::current_exe().map_err(|e| format!("current_exe: {}", e))?;
-    let args = filtered_argv();
+    let mut args = filtered_argv();
+    ensure_uuid(&mut args, uuid);
     // Komut satırı: `"exe" "arg1" ...` (CreateProcessW mutable buffer ister).
     let mut cmdline = quote_arg(&exe.to_string_lossy());
     for a in &args {
@@ -256,6 +257,25 @@ fn filtered_argv() -> Vec<String> {
         out.push(a);
     }
     out
+}
+
+/// Re-exec argv'sine `--uuid` göm: `watch` sonrasına ekle (clap `--`
+/// öncesinde bayrakları her yerde kabul eder). Kullanıcı zaten vermişse
+/// dokunma (cfg.uuid zaten onunki).
+#[cfg(windows)]
+fn ensure_uuid(args: &mut Vec<String>, uuid: &str) {
+    let end = args.iter().position(|a| a == "--").unwrap_or(args.len());
+    if args[..end].iter().any(|a| a == "--uuid" || a.starts_with("--uuid=")) {
+        return;
+    }
+    // argv[0] = "watch" (binary skip'li); hemen ardına ekle.
+    let pos = if args.first().map(|s| s == "watch").unwrap_or(false) {
+        1
+    } else {
+        0
+    };
+    args.insert(pos, uuid.to_string());
+    args.insert(pos, "--uuid".to_string());
 }
 
 #[cfg(windows)]

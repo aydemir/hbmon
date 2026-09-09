@@ -111,7 +111,7 @@ pub fn spawn_watch(cfg: MonitorConfig, detach: bool) -> Result<MonitorConfig, St
         run_daemon(cfg.clone())?;
         return Ok(cfg);
     }
-    crate::platform::detach::detach()?;
+    crate::platform::detach::detach(&cfg.uuid)?;
     match run_daemon(cfg.clone()) {
         Ok(_) => std::process::exit(0),
         Err(_) => std::process::exit(3),

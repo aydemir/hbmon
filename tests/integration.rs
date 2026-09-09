@@ -279,9 +279,47 @@ fn wait_until_dep_missing_returns_early() {
         .unwrap();
 }
 
+/// uuid verilmezse parent handshake basar, detach'lanan çocuk AYNI
+/// uuid'yi kullanmalıdır — yoksa handshake'taki sock boşa düşer ve
+/// status/wait sonsuza dek "bulunamadı" verir (LIVE ile yakalandı).
 #[test]
-fn wait_until_stall_suspect_returns_early() {
-    let id = uuid("until-stall");
+fn watch_without_uuid_handshake_matches_daemon() {
+    let out = hbmon()
+        .args(["watch", "--detach", "--", "echo", "hi"])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    let hs: Value = serde_json::from_slice(&out.stdout).expect("handshake is JSON");
+    let sock = hs["sock"].as_str().expect("handshake has sock").to_string();
+    assert!(hs["uuid"].as_str().is_some());
+    // daemon aynı sock'ta dinliyor olmalı (startup toleranslı yokla).
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+    loop {
+        let st = hbmon()
+            .args(["status", "--sock", &sock])
+            .timeout(Duration::from_secs(10))
+            .output()
+            .unwrap();
+        if st.status.success() {
+            let v: Value = serde_json::from_slice(&st.stdout).unwrap();
+            assert_eq!(v["ok"], true);
+            break;
+        }
+        if std::time::Instant::now() >= deadline {
+            panic!("daemon never served handshake sock {}", sock);
+        }
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    hbmon()
+        .args(["shutdown", "--sock", &sock])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}
+
+#[test]
+fn wait_until_stall_suspect_returns_early() {    let id = uuid("until-stall");
     let s = sock_for(&id);
     let out = hbmon()
         .args(watch_args(&id, sleep_cmd(45)))
