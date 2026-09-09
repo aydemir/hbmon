@@ -64,3 +64,36 @@ pub fn error_response(id: &str, code: &str, message: &str) -> Value {
         "err": {"code": code, "message": message}
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ok_response_shape() {
+        let mut extra = serde_json::Map::new();
+        extra.insert("state".to_string(), serde_json::json!("running"));
+        let r = ok_response("req-1", extra);
+        assert_eq!(r["v"], 1);
+        assert_eq!(r["id"], "req-1");
+        assert_eq!(r["ok"], true);
+        assert_eq!(r["state"], "running");
+    }
+
+    #[test]
+    fn error_response_shape() {
+        let r = error_response("req-2", "UNKNOWN_OP", "nope");
+        assert_eq!(r["ok"], false);
+        assert_eq!(r["err"]["code"], "UNKNOWN_OP");
+    }
+
+    #[test]
+    fn request_roundtrip() {
+        let mut q = Request::new("wait", "a");
+        q.timeout_sec = Some(30.0);
+        let s = serde_json::to_string(&q).unwrap();
+        let back: Request = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.op, "wait");
+        assert_eq!(back.timeout_sec, Some(30.0));
+    }
+}

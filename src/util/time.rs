@@ -36,3 +36,18 @@ pub fn format_epoch_iso(secs: i64) -> String {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn epoch_zero_formats() {
+        assert_eq!(format_epoch_iso(0), "1970-01-01T00:00:00Z");
+    }
+
+    #[test]
+    fn known_date_formats() {
+        assert_eq!(format_epoch_iso(1788912000), "2026-09-09T00:00:00Z");
+    }
+}

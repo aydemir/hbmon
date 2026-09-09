@@ -51,3 +51,29 @@ pub fn map_build_exit(code: i32) -> (State, i32) {
         (State::Failed, 1)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exit_codes_follow_rfc() {
+        assert_eq!(State::Done.exit_code(0), 0);
+        assert_eq!(State::Failed.exit_code(1), 1);
+        assert_eq!(State::DepMissing.exit_code(0), 2);
+        assert_eq!(State::OomKilled.exit_code(0), 137);
+        assert_eq!(State::Timeout.exit_code(0), 124);
+    }
+
+    #[test]
+    fn build_exit_mapping() {
+        assert_eq!(map_build_exit(0), (State::Done, 0));
+        assert_eq!(map_build_exit(1), (State::Failed, 1));
+    }
+
+    #[test]
+    fn state_names() {
+        assert_eq!(State::Stalled.as_str(), "stalled");
+        assert_eq!(State::OomKilled.as_str(), "oom_killed");
+    }
+}

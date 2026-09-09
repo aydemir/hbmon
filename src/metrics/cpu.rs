@@ -43,3 +43,40 @@ impl Default for CpuTracker {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_sample_is_zero() {
+        let mut t = CpuTracker::new();
+        assert_eq!(t.update(100, 5000), 0.0);
+    }
+
+    #[test]
+    fn no_jiffy_delta_is_zero() {
+        let mut t = CpuTracker::new();
+        t.update(100, 5000);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        assert_eq!(t.update(100, 5000), 0.0);
+    }
+
+    #[test]
+    fn jiffy_delta_is_positive_and_bounded() {
+        let mut t = CpuTracker::new();
+        t.update(100, 1000);
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let pct = t.update(100, 1100);
+        assert!(pct > 0.0 && pct <= 3200.0);
+    }
+
+    #[test]
+    fn evict_gone_drops_dead_pids() {
+        let mut t = CpuTracker::new();
+        t.update(1, 10);
+        t.update(2, 20);
+        t.evict_gone(&[2]);
+        assert_eq!(t.update(1, 999), 0.0);
+    }
+}

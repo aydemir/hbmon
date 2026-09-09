@@ -55,3 +55,45 @@ pub fn match_line(line: &str) -> Option<DepMatch> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn npm_message_matches() {
+        let m = match_line("Error: Cannot find module 'express'").unwrap();
+        assert_eq!(m.pattern_id, "npm_module");
+        assert_eq!(m.category, "dep_missing:npm");
+    }
+
+    #[test]
+    fn python_message_matches() {
+        let m = match_line("ModuleNotFoundError: No module named 'requests'").unwrap();
+        assert_eq!(m.pattern_id, "py_module");
+    }
+
+    #[test]
+    fn shell_not_found_matches() {
+        assert!(match_line("make: gcc: command not found").is_some());
+    }
+
+    #[test]
+    fn missing_file_matches() {
+        assert!(match_line("cc: foo.c: No such file or directory").is_some());
+    }
+
+    #[test]
+    fn ordinary_output_no_match() {
+        assert!(match_line("Compiling hbmon v0.1.0 (/root/hbmon)").is_none());
+        assert!(match_line("    Finished dev profile in 20.71s").is_none());
+        assert!(match_line("").is_none());
+    }
+
+    #[test]
+    fn match_text_truncated_to_300() {
+        let long = "x".repeat(500);
+        let m = match_line(&format!("command not found {}", long)).unwrap();
+        assert!(m.match_text.chars().count() <= 300);
+    }
+}

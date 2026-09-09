@@ -29,3 +29,36 @@ pub fn set_timeouts(stream: &UnixStream, secs: u64) {
     let _ = stream.set_read_timeout(Some(d));
     let _ = stream.set_write_timeout(Some(d));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn roundtrip_one_message() {
+        let (a, b) = UnixStream::pair().unwrap();
+        let mut reader = BufReader::new(a);
+        let mut writer = b;
+        let v = serde_json::json!({"v":1,"op":"status","id":"t-1"});
+        write_message(&mut writer, &v).unwrap();
+        assert_eq!(read_message(&mut reader).unwrap(), v);
+    }
+
+    #[test]
+    fn empty_line_is_error() {
+        let (a, b) = UnixStream::pair().unwrap();
+        let mut reader = BufReader::new(a);
+        let mut writer = b;
+        writer.write_all(b"\n").unwrap();
+        assert!(read_message(&mut reader).is_err());
+    }
+
+    #[test]
+    fn bad_json_is_error() {
+        let (a, b) = UnixStream::pair().unwrap();
+        let mut reader = BufReader::new(a);
+        let mut writer = b;
+        writer.write_all(b"{oops\n").unwrap();
+        assert!(read_message(&mut reader).is_err());
+    }
+}

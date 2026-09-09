@@ -99,3 +99,62 @@ impl Default for StallDetector {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn aged(secs: u64) -> StallDetector {
+        StallDetector {
+            start: Instant::now() - Duration::from_secs(secs),
+            silent_samples: vec![],
+            current_idle: 0.0,
+            in_stall: false,
+        }
+    }
+
+    #[test]
+    fn fresh_detector_never_stalls_short_build() {
+        let mut s = StallDetector::new();
+        let (entered, _) = s.tick(false, 100.0);
+        assert!(!entered);
+        assert!(!s.in_stall());
+    }
+
+    #[test]
+    fn prolonged_silence_enters_stall() {
+        let mut s = aged(61);
+        let (entered, resolved) = s.tick(false, 31.0);
+        assert!(entered);
+        assert!(!resolved);
+        assert!(s.in_stall());
+        assert_eq!(s.score(), 1.0);
+    }
+
+    #[test]
+    fn activity_resolves_stall() {
+        let mut s = aged(61);
+        s.tick(false, 31.0);
+        let (entered, resolved) = s.tick(true, 0.5);
+        assert!(!entered);
+        assert!(resolved);
+        assert!(!s.in_stall());
+    }
+
+    #[test]
+    fn default_threshold_is_30s() {
+        let s = aged(61);
+        assert_eq!(s.threshold(), 30.0);
+        assert_eq!(s.p95_idle(), 5.0);
+    }
+
+    #[test]
+    fn idle_accumulates_and_resets() {
+        let mut s = aged(61);
+        s.tick(false, 5.0);
+        assert_eq!(s.idle(), 5.0);
+        s.tick(true, 0.5);
+        assert_eq!(s.idle(), 0.0);
+    }
+}
