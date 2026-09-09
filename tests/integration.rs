@@ -19,6 +19,26 @@ fn hbmon() -> Command {
     Command::cargo_bin("hbmon").unwrap()
 }
 
+/// Daemon handshake'i fork'tan ÖNCE basar; socket'in bind olması
+/// yüklü makinede gecikebilir. Tek atış yerine hazır olana kadar yokla.
+fn wait_for_ready(sock: &str) {
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+    loop {
+        let st = hbmon()
+            .args(["status", "--sock", sock])
+            .timeout(Duration::from_secs(10))
+            .output()
+            .unwrap();
+        if st.status.success() {
+            return;
+        }
+        if std::time::Instant::now() >= deadline {
+            panic!("daemon never came up for {}", sock);
+        }
+        std::thread::sleep(Duration::from_millis(300));
+    }
+}
+
 #[test]
 fn exec_handshake_and_exit_zero() {
     let out = hbmon()
@@ -67,6 +87,7 @@ fn watch_status_wait_full_cycle() {
         serde_json::from_slice(&out.stdout).expect("watch prints handshake");
     assert_eq!(hs["uuid"], id.as_str());
 
+    wait_for_ready(&s);
     let st = hbmon()
         .args(["status", "--sock", &s])
         .timeout(Duration::from_secs(30))
@@ -100,7 +121,7 @@ fn kill_terminates_build() {
         .output()
         .unwrap();
     assert!(out.status.success());
-    std::thread::sleep(Duration::from_secs(2));
+    wait_for_ready(&s);
 
     let k = hbmon()
         .args(["kill", "--sock", &s, "--signal", "TERM"])
