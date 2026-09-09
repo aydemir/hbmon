@@ -4,6 +4,7 @@
 
 use assert_cmd::Command;
 use serde_json::Value;
+use std::path::PathBuf;
 use std::time::Duration;
 
 fn uuid(tag: &str) -> String {
@@ -136,6 +137,15 @@ fn exec_handshake_and_exit_zero() {
     let hs: Value = serde_json::from_str(first).expect("handshake is JSON");
     assert_eq!(hs["ev"], "ready");
     assert!(hs["sock"].as_str().unwrap().contains("hbmon-"));
+    // TASK-007 ephemeral contract: exec spawns no daemon, so the handshake
+    // must say so and no socket file may exist.
+    assert_eq!(hs["ephemeral"], true);
+    let sock_path = PathBuf::from(hs["sock"].as_str().unwrap());
+    assert!(
+        !sock_path.exists(),
+        "exec must not create a live socket: {}",
+        sock_path.display()
+    );
     assert!(stdout.contains("hi"));
 }
 

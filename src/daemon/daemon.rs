@@ -11,7 +11,7 @@
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
-use std::io::{BufRead, BufReader};
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -214,6 +214,9 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     let mut last_metric_ev = Instant::now() - Duration::from_secs(10);
     let mut last_oom_poll = Instant::now() - Duration::from_secs(10);
     let mut dep_found: Option<DepMatch> = None;
+    // Stale prefix guard: .out is append-opened, so a reused path could hold
+    // a previous run's bytes. Start scanning where the file ends now.
+    let mut dep_offset: u64 = std::fs::metadata(&cfg.out).map(|m| m.len()).unwrap_or(0);
 
     std::thread::sleep(Duration::from_millis(200));
 
@@ -347,7 +350,7 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         }
 
         if dep_found.is_none() {
-            if let Some(dm) = scan_out_for_dep(&cfg.out) {
+            if let Some(dm) = scan_out_for_dep(&cfg.out, &mut dep_offset) {
                 let ev = events::new_event(
                     "dep_missing",
                     &cfg.uuid,
@@ -523,11 +526,29 @@ struct DepMatch {
     match_text: String,
 }
 
-fn scan_out_for_dep(out: &Path) -> Option<DepMatch> {
-    let f = std::fs::File::open(out).ok()?;
-    let r = BufReader::new(f);
-    let lines: Vec<String> = r.lines().flatten().collect();
-    for line in lines.iter().rev().take(50) {
+/// Incremental dep-scan (TASK-006): reads only bytes appended since the last
+/// tick instead of the whole `.out` file. A trailing partial line (build
+/// still writing, no `\n` yet) is held back — the offset stays before it so
+/// it is re-scanned next tick once terminated. Truncate/rotate (`len <
+/// offset`) resets to 0. All new lines are scanned (the old whole-file
+/// `take(50)` guard is unnecessary once stale bytes are never re-read).
+fn scan_out_for_dep(out: &Path, offset: &mut u64) -> Option<DepMatch> {
+    let mut f = std::fs::File::open(out).ok()?;
+    let len = f.metadata().ok()?.len();
+    if len < *offset {
+        *offset = 0;
+    }
+    f.seek(SeekFrom::Start(*offset)).ok()?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).ok()?;
+    let consumed = buf
+        .iter()
+        .rposition(|&b| b == b'\n')
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    *offset += consumed as u64;
+    let text = String::from_utf8_lossy(&buf[..consumed]);
+    for line in text.lines().rev() {
         if let Some(m) = dep_missing::match_line(line) {
             return Some(DepMatch {
                 pattern_id: m.pattern_id,
@@ -823,5 +844,55 @@ mod tests {
             Some("failed".to_string())
         );
         assert_eq!(wait_match(State::Running, &u, false, false), None);
+    }
+
+    #[test]
+    fn dep_scan_reads_only_new_bytes() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("build.out");
+        std::fs::write(&path, "").unwrap();
+        let mut off = 0u64;
+
+        // benign output: no match, offset advances past it
+        std::fs::write(&path, "compiling foo\nlinking bar\n").unwrap();
+        assert!(scan_out_for_dep(&path, &mut off).is_none());
+        let after_benign = off;
+        assert!(after_benign > 0);
+
+        // appended dep line is found; old bytes are never re-read
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap();
+        writeln!(f, "bash: cargo: command not found").unwrap();
+        drop(f);
+        let dm = scan_out_for_dep(&path, &mut off).expect("dep must match");
+        assert_eq!(dm.pattern_id, "cmd_not_found");
+        assert!(off > after_benign);
+
+        // trailing partial line is held back (offset frozen), then matched
+        // once terminated
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap();
+        write!(f, "partial: ModuleNotFoundError: No module named 'numpy'").unwrap();
+        drop(f);
+        let frozen = off;
+        assert!(scan_out_for_dep(&path, &mut off).is_none());
+        assert_eq!(off, frozen);
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&path)
+            .unwrap();
+        writeln!(f).unwrap();
+        drop(f);
+        let dm = scan_out_for_dep(&path, &mut off).expect("held line must match");
+        assert_eq!(dm.pattern_id, "py_module");
+
+        // truncate/rotate resets the offset instead of going blind
+        std::fs::write(&path, "fresh start\n").unwrap();
+        assert!(scan_out_for_dep(&path, &mut off).is_none());
     }
 }

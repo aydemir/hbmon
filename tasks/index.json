@@ -5,7 +5,10 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["health", "dep-missing"],
+    "labels": [
+      "health",
+      "dep-missing"
+    ],
     "depends_on": [],
     "created": "2026-09-09",
     "updated": "2026-09-09",
@@ -17,7 +20,10 @@
     "status": "in_progress",
     "priority": "P1",
     "environment": "both",
-    "labels": ["release", "distribution"],
+    "labels": [
+      "release",
+      "distribution"
+    ],
     "depends_on": [],
     "created": "2026-09-09",
     "updated": "2026-09-09",
@@ -29,7 +35,10 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["demo", "adoption"],
+    "labels": [
+      "demo",
+      "adoption"
+    ],
     "depends_on": [],
     "created": "2026-09-09",
     "updated": "2026-09-09",
@@ -41,7 +50,10 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["migration", "opencode-plugins"],
+    "labels": [
+      "migration",
+      "opencode-plugins"
+    ],
     "depends_on": [],
     "created": "2026-09-09",
     "updated": "2026-09-09",
@@ -53,10 +65,79 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["ipc", "wait", "protocol"],
+    "labels": [
+      "ipc",
+      "wait",
+      "protocol"
+    ],
     "depends_on": [],
     "created": "2026-09-09",
     "updated": "2026-09-09",
     "file": "tasks/done/TASK-005-wait-until.md"
+  },
+  {
+    "id": "TASK-006",
+    "title": "Windows portu (named pipe)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": [
+      "platform",
+      "windows"
+    ],
+    "depends_on": [],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/done/TASK-006-windows-port.md"
+  },
+  {
+    "id": "TASK-007",
+    "title": "exec ephemeral handshake",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": [
+      "cli",
+      "contract",
+      "exec"
+    ],
+    "depends_on": [],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/done/TASK-007-exec-ephemeral-handshake.md"
+  },
+  {
+    "id": "TASK-008",
+    "title": "Dead-dep + RFC drift temizligi",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": [
+      "docs",
+      "deps",
+      "rfc"
+    ],
+    "depends_on": [
+      "TASK-007"
+    ],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/done/TASK-008-dead-dep-rfc-drift.md"
+  },
+  {
+    "id": "TASK-009",
+    "title": "Incremental dep-scan (B1 perf)",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": [
+      "daemon",
+      "perf",
+      "dep-missing"
+    ],
+    "depends_on": [],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/done/TASK-009-incremental-dep-scan.md"
   }
 ]

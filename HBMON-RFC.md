@@ -399,10 +399,13 @@ LLM `hbmon wait` veya `hbmon exec` kullanırsa, daemon LLM'in parent'ı olarak �
 | `2` | Dependency missing | Pattern match: "command not found", "ModuleNotFoundError", vb. |
 | `3` | Genel süreç hatası | Beklenmeyen (crash, signal) |
 | `124` | Timeout | `--timeout-sec` aşıldı |
-| `130` | SIGINT (Ctrl+C) | Kullanıcı iptal |
-| `137` | OOM killer | dmesg/journalctl tespit |
-| `143` | SIGTERM | Daemon tarafından öldürüldü |
-| `147` | Stall > 3× eşik | Adaptif stall kuralı (Section 7.2) |
+| `130` | SIGINT (Ctrl+C) | Kullanıcı iptal — implement edilmedi |
+| `137` | OOM killer | dmesg/cgroup tespiti |
+| `143` | SIGTERM | Daemon tarafından öldürüldü — implement edilmedi |
+
+> Not (v1 gerçekleşmesi): stall exit koduna yansımaz — `Stalled` yalnızca
+> `state` + `stall_suspect` event'idir, build çıkış kodu aynen iletilir.
+> `147` kodu bu RFC'nin eski taslağındandı, implement edilmedi.
 
 **Avantaj:** Tüm harness'lar exit code'u anlar. Ek contract gerekmez.
 
@@ -608,7 +611,7 @@ oom-kill:constraint=CONSTRAINT_MEMCG,...
 
 **Tetikleme:** Pattern eşleşirse → `state = "dep_missing"`, `ev = "dep_missing"`, exit 2.
 
-**Kullanıcı genişletmesi:** `~/.config/hbmon/patterns.toml` ile ek pattern'ler (v1.5).
+**Kullanıcı genişletmesi:** `~/.config/hbmon/patterns.json` (yoksa `$XDG_CONFIG_HOME/hbmon/patterns.json`) ile ek pattern'ler — v1'de (RFC taslağındaki `patterns.toml` yerine JSON: sıfır-dep ilkesi, TASK-001).
 
 ### 7.5 Timeout
 
@@ -622,7 +625,10 @@ oom-kill:constraint=CONSTRAINT_MEMCG,...
 
 ### 8.1 `status` Response (Tam)
 
-`status` yanıtı şu alanları içerir: `v`, `id`, `ok`, `state` (`running` | `stalled` | `oom_killed` | `done` | `failed` | `dep_missing` | `timeout`), `uuid`, `root_pid`, `root_cmd`, `started_at`, `elapsed_sec`, `eta_sec` (opsiyonel), `metrics` (`cpu_pct`, `rss_mb`, `io_read_mb`, `io_write_mb`, `fds_open`, `net_tcp`, `net_udp`), `tree` (pid/cmd/cpu/rss_mb/state/children), `health` (`stall_score`, `threshold_sec`, `last_io_at`, `last_cpu_nonzero_at`, `last_child_spawn_at`), `log_tail`, `last_event`.
+`status` yanıtı şu alanları içerir: `v`, `id`, `ok`, `state` (`running` | `stalled` | `oom_killed` | `done` | `failed` | `dep_missing` | `timeout`), `uuid`, `root_pid`, `root_cmd`, `started_at`, `elapsed_sec`, `metrics` (`cpu_pct`, `rss_mb`, `io_read_mb`, `io_write_mb`, `fds_open`, `net_tcp`, `net_udp`), `tree` (pid/cmd/cpu/rss_mb/state/children), `health` (`stall_score`, `threshold_sec`, `last_io_at`, `last_cpu_nonzero_at`, `last_child_spawn_at`), `log_tail`, `last_event`.
+
+> Not (v1 gerçekleşmesi): `eta_sec` şemada opsiyonel olarak durur ama daemon
+> şu an dönmüyor — gelecek çalışma (v1.5+).
 
 ### 8.2 Alan Açıklamaları
 
@@ -637,7 +643,7 @@ oom-kill:constraint=CONSTRAINT_MEMCG,...
 | `root_cmd` | string | Kök süreç komut satırı |
 | `started_at` | timestamp | Daemon başlangıç zamanı |
 | `elapsed_sec` | float | `now - started_at` |
-| `eta_sec` | float? | Tahmini kalan süre (opsiyonel) |
+| `eta_sec` | float? | Tahmini kalan süre — v1'de dönülmüyor (gelecek) |
 | `metrics.cpu_pct` | float | Süreç ağacı toplam CPU % |
 | `metrics.rss_mb` | u32 | Toplam RSS (MB) |
 | `metrics.io_read_mb` | u32 | Toplam okuma I/O (build başından beri) |
@@ -692,9 +698,9 @@ oom-kill:constraint=CONSTRAINT_MEMCG,...
 | `INVALID_REQUEST` | JSON parse / schema hatası |
 | `UNKNOWN_OP` | Bilinmeyen operation |
 | `BUILD_NOT_FOUND` | İzlenen süreç artık yok |
-| `ALREADY_SHUTDOWN` | Daemon kapanmış |
-| `TIMEOUT` | `wait` timeout aşıldı |
-| `INTERNAL` | Beklenmeyen internal hata |
+| `ALREADY_SHUTDOWN` | Daemon kapanmış — implement edilmedi (dispatch'te yok) |
+| `TIMEOUT` | `wait` timeout aşıldı — implement edilmedi (`wait` bunun yerine `ok:true` + `timeout:true` döner) |
+| `INTERNAL` | Beklenmeyen internal hata — implement edilmedi |
 
 ---
 
@@ -841,14 +847,14 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 
 - [x] Linux tam izleme + macOS süreç gözetimi
 - [x] Daemonization, UDS JSON-RPC, JSONL, exit mapping
-- [x] Stall/OOM/dep-missing/timeout, ETA iskeleti
+- [x] Stall/OOM/dep-missing/timeout (ETA gelecek — v1'de `eta_sec` dönülmüyor)
 - [x] CLI: watch, status, wait, exec, kill, shutdown, cleanup
-- [x] 26 unit + 4 integration test
+- [x] 41 unit + 7 integration test (2026-09-09, `cargo test --locked -j2` yeşil)
 
 ### 14.2 v1.5
 
-- [ ] Container-aware (cgroup v2)
-- [ ] Custom patterns (`~/.config/hbmon/patterns.toml`)
+- [x] Container-aware (cgroup v2) — v1'e çekildi (graceful fallback, TASK-öncesi)
+- [x] Custom patterns (`~/.config/hbmon/patterns.json`; taslaktaki TOML yerine JSON — sıfır-dep, TASK-001) — v1'e çekildi
 - [ ] `journalctl` OOM desteği, supervised mode
 - [ ] TUI (Ratatui)
 
@@ -879,6 +885,7 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 6. Stall skoru float mi boolean mi?
 7. Lisans: dual MIT/Apache-2.0 seçildi (2026-09-09).
 8. Test stratejisi: unit (mock'suz, gerçek regex/stall/CPU) + integration (gerçek daemon) benimsendi.
+9. v1.0.1 bakımı 2026-09-09'da kapatıldı: TASK-006 (artımlı dep-scan), TASK-007 (exec ephemeral handshake), TASK-008 (ölü bağımlılık + bu RFC'deki drift notları).
 
 ---
 
@@ -886,7 +893,7 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 
 - `aydemir/opencode-plugins` — `build-mon.sh`, `opencode-settle-noticer`, DHS PTC (varlık kanıtı)
 - POSIX: `setsid(2)`, `fork(2)`; Linux: `proc(5)`, `oom(7)`; macOS: `libproc.h`, `proc_pidinfo(3)`
-- Rust: `clap` 4, `serde`/`serde_json` 1, `libc` 0.2, `crossbeam-channel` 0.5, `regex` 1
+- Rust: `clap` 4, `serde`/`serde_json` 1, `libc` 0.2, `regex` 1, `once_cell` 1, `rand` 0.8
 - Build sistemleri: Recursive Make Considered Harmful (Miller, 1997); Build Systems à la Carte (Mokhov et al., 2018)
 
 ---

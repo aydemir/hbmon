@@ -33,7 +33,8 @@ hbmon status --sock /tmp/hbmon-<uuid>.sock
 # Bitene kadar bekle (bloklamalı)
 hbmon wait --sock /tmp/hbmon-<uuid>.sock --timeout 600
 
-# Ön planda çalıştır (ilk satır handshake JSON)
+# Ön planda çalıştır (ilk satır handshake JSON; ephemeral — daemon yok,
+# status/wait kullanılamaz, çıkışta sock/log oluşmaz)
 hbmon exec -- make -j8   # exit: 0 ok, 1 fail, 2 dep-missing
 hbmon exec --format json -- make -j8  # stderr son satır: JSON özet
 
@@ -41,6 +42,20 @@ hbmon exec --format json -- make -j8  # stderr son satır: JSON özet
 hbmon kill --sock ... --signal TERM
 hbmon shutdown --sock ...
 ```
+
+## Ajanlar için (otomat hızlı yolu)
+
+Bu bölüm LLM ajanları içindir; detaylı sözleşme `HBMON-RFC.md`'dedir, orayı ıskalamayın.
+
+1. `hbmon watch --detach -- <cmd>` → stdout satır 1 = handshake JSON
+   `{v,ev:"ready",uuid,sock,log}`. Satır 1'i parse et, `sock`'u sakla.
+2. Poll: `hbmon status --sock $SOCK`, veya bloklan:
+   `hbmon wait --sock $SOCK --until done,failed,dep_missing,timeout`.
+3. Exit: `0 done / 1 failed / 2 dep-missing / 124 timeout / 137 oom / 3 iç hata`.
+   `2` ise eksik paketi kur + yeniden dene.
+4. `exec` ephemeral'dır: handshake'teki `sock`/`log` rezerve addır, dosya
+   oluşmaz — `status`/`wait` deneme.
+5. Keşif sırası: `--sock > $HBMON_SOCK > /tmp/hbmon-*.sock` (newest).
 
 ## Durum
 

@@ -20,3 +20,6 @@
 | TASK-004 | opencode-plugins migrasyonu | done | P2 |
 | TASK-005 | wait --until erken dönüş | done | P1 |
 | TASK-006 | Windows portu (named pipe) | done | P2 |
+| TASK-007 | exec ephemeral handshake | done | P1 |
+| TASK-008 | Dead-dep + RFC drift temizligi | done | P2 |
+| TASK-009 | Incremental dep-scan (B1 perf) | done | P1 |

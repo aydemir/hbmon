@@ -31,12 +31,17 @@ pub fn run(a: ExecArgs) -> Result<i32, String> {
     // handshake FIRST so LLM can grab it even if build floods output.
     // serde_json ile serialize edilir: Windows pipe yolu (`\\.\pipe\…`)
     // tersbölüleri manuel format ile geçersiz JSON üretirdi.
+    // Ephemeral contract (TASK-007): no daemon is spawned, so no socket or
+    // JSONL is created; status/wait are unavailable. sock/log are reserved
+    // names only, kept for forward-compatibility.
     println!(
         "{}",
         serde_json::json!({
             "v": 1, "ev": "ready", "uuid": uuid,
             "sock": paths::sock_display(&sock),
             "log": log.to_string_lossy(),
+            "ephemeral": true,
+            "note": "no daemon; status/wait unavailable",
         })
     );
     std::io::stdout().flush().ok();
