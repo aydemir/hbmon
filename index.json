@@ -1,0 +1,64 @@
+{
+  "name": "hbmon",
+  "version": "0.1.0",
+  "description": "Harness-bagimsiz build monitor — tek binary, UDS JSON-RPC + JSONL, LLM ajanlari icin.",
+  "type": "module",
+  "modules": [
+    {
+      "id": "cli",
+      "file": "src/cli/mod.rs",
+      "docs": "README.md",
+      "tests": "tests/integration.rs",
+      "status": "stable"
+    },
+    {
+      "id": "daemon",
+      "file": "src/daemon/daemon.rs",
+      "docs": "HBMON-RFC.md",
+      "tests": "tests/integration.rs",
+      "status": "stable"
+    },
+    {
+      "id": "ipc",
+      "file": "src/ipc/mod.rs",
+      "docs": "HBMON-RFC.md",
+      "tests": "src/ipc/codec.rs",
+      "status": "stable"
+    },
+    {
+      "id": "proc",
+      "file": "src/proc/mod.rs",
+      "docs": "HBMON-RFC.md",
+      "tests": null,
+      "status": "stable"
+    },
+    {
+      "id": "metrics",
+      "file": "src/metrics/mod.rs",
+      "docs": "HBMON-RFC.md",
+      "tests": "src/metrics/cpu.rs",
+      "status": "stable"
+    },
+    {
+      "id": "health",
+      "file": "src/health/mod.rs",
+      "docs": "HBMON-RFC.md",
+      "tests": "src/health/dep_missing.rs",
+      "status": "stable"
+    },
+    {
+      "id": "eventlog",
+      "file": "src/eventlog/mod.rs",
+      "docs": "HBMON-RFC.md",
+      "tests": null,
+      "status": "stable"
+    },
+    {
+      "id": "platform",
+      "file": "src/platform/mod.rs",
+      "docs": "HBMON-RFC.md",
+      "tests": null,
+      "status": "partial-macos"
+    }
+  ]
+}

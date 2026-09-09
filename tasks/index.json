@@ -1,0 +1,50 @@
+[
+  {
+    "id": "TASK-001",
+    "title": "Custom dep-missing patterns",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["health", "dep-missing"],
+    "depends_on": [],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/done/TASK-001-custom-patterns.md"
+  },
+  {
+    "id": "TASK-002",
+    "title": "Release + crates.io yayını",
+    "status": "todo",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["release", "distribution"],
+    "depends_on": [],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/todo/TASK-002-release-cratesio.md"
+  },
+  {
+    "id": "TASK-003",
+    "title": "Dogfooding + demo",
+    "status": "todo",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["demo", "adoption"],
+    "depends_on": [],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/todo/TASK-003-dogfooding-demo.md"
+  },
+  {
+    "id": "TASK-004",
+    "title": "opencode-plugins migrasyonu",
+    "status": "todo",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["migration", "opencode-plugins"],
+    "depends_on": [],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/todo/TASK-004-plugin-migrasyonu.md"
+  }
+]
