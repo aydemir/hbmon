@@ -1,0 +1,86 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            pkg: tar.gz
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            pkg: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            pkg: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            pkg: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - name: build
+        run: cargo build --locked --release --target ${{ matrix.target }}
+      - name: stage
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME:-local}"
+          base="hbmon-${tag}-${{ matrix.target }}"
+          mkdir -p pkg
+          bin="target/${{ matrix.target }}/release/hbmon"
+          if [ "${{ matrix.pkg }}" = "zip" ]; then bin="${bin}.exe"; fi
+          ls -la "$bin"
+          cp "$bin" pkg/
+          cp README.md LICENSE-MIT LICENSE-APACHE pkg/
+          echo "$base"
+          echo "ASSET_BASE=$base" >> "$GITHUB_ENV"
+      - name: pack (unix)
+        if: matrix.pkg == 'tar.gz'
+        shell: bash
+        run: |
+          cd pkg
+          tar -czf "../${ASSET_BASE}.tar.gz" hbmon README.md LICENSE-MIT LICENSE-APACHE
+          cd ..
+          shasum -a 256 "${ASSET_BASE}.tar.gz" > "${ASSET_BASE}.sha256"
+      - name: pack (windows)
+        if: matrix.pkg == 'zip'
+        shell: powershell
+        run: |
+          Compress-Archive -Path pkg\* -DestinationPath "$env:ASSET_BASE.zip"
+          (Get-FileHash "$env:ASSET_BASE.zip" -Algorithm SHA256).Hash.ToLower() + "  $env:ASSET_BASE.zip" | Out-File -Encoding ascii "$env:ASSET_BASE.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ASSET_BASE }}
+          path: |
+            ${{ env.ASSET_BASE }}.tar.gz
+            ${{ env.ASSET_BASE }}.zip
+            ${{ env.ASSET_BASE }}.sha256
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: release
+        shell: bash
+        run: |
+          ls -la dist
+          gh release create "${GITHUB_REF_NAME}" dist/* \
+            --title "${GITHUB_REF_NAME}" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

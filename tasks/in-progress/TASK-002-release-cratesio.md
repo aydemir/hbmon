@@ -21,7 +21,9 @@ boyutunu ölçmek (<5MB hedefi doğrulanacak).
 ## Kapsam
 
 - `cargo build --release`, boyut ölçümü, README'ye kurulum satırı
-- `cargo publish --dry-run`, sonra gerçek yayın
+- `cargo publish --dry-run`, sonra gerçek yayın (kullanıcı: henüz erken — bekliyor)
+- GitHub prebuilt: `release.yml` eklendi (tag `v*` veya manuel → 4 platform
+  asset'i + sha256; ilk tag crates.io ile aynı gün kesilecek)
 - Yapılmayacaklar: Homebrew/Nix (talep gelirse ayrı task)
 
 ## Uygulama Planı
