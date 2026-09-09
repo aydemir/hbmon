@@ -23,7 +23,7 @@ use crate::health::{dep_missing, oom, stall::StallDetector, timeout::TimeoutWatc
 use crate::ipc::{error_response, protocol::ok_response};
 use crate::metrics::CpuTracker;
 use crate::platform::inspector;
-use crate::proc::{collect_descendants, ProcessInspector};
+use crate::proc::collect_descendants;
 use crate::util::time::{now_iso, now_secs};
 
 use super::pidfile;
@@ -90,8 +90,6 @@ struct Shared {
     last_spawn_at: Mutex<String>,
     last_event: Mutex<Value>,
     totals: Mutex<HashMap<String, Value>>,
-    log_path: PathBuf,
-    start_instant: Instant,
     shutdown: Mutex<bool>,
 }
 
@@ -214,8 +212,6 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         last_spawn_at: Mutex::new(started_iso.clone()),
         last_event: Mutex::new(json!({"ev":"ready"})),
         totals: Mutex::new(HashMap::new()),
-        log_path: cfg.log.clone(),
-        start_instant: Instant::now(),
         shutdown: Mutex::new(false),
     });
 
@@ -276,12 +272,16 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
 
         let pids = collect_descendants(&*insp, child_pid, 1000);
         let bulk = insp.bulk_metrics(&pids).unwrap_or_default();
+        // CPU deltas: CpuTracker converts jiffies -> % per pid (Linux).
+        // v0.1 review fix: tracker output used to be discarded
+        // (`let _ = pct`) while bulk cpu_pct is always 0.0, so tot_cpu
+        // stayed 0 and the stall detector lost its CPU leg.
+        let mut cpu_by_pid: HashMap<u32, f32> = HashMap::new();
         #[cfg(target_os = "linux")]
         {
             for &p in &pids {
                 if let Some(j) = crate::proc::linux::cpu_jiffies(p) {
-                    let pct = tracker.update(p, j);
-                    let _ = pct;
+                    cpu_by_pid.insert(p, tracker.update(p, j));
                 }
             }
             tracker.evict_gone(&pids);
@@ -292,8 +292,8 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         let mut tot_w: u64 = 0;
         let mut tot_fds = 0u32;
         let mut tot_tcp = 0u32;
-        for m in bulk.values() {
-            tot_cpu += m.cpu_pct;
+        for (pid, m) in bulk.iter() {
+            tot_cpu += cpu_by_pid.get(pid).copied().unwrap_or(m.cpu_pct);
             tot_rss = tot_rss.saturating_add(m.rss_mb);
             tot_r = tot_r.saturating_add(m.io_read_bytes);
             tot_w = tot_w.saturating_add(m.io_write_bytes);
