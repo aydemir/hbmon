@@ -142,7 +142,7 @@ fn daemonize() -> Result<(), String> {
         libc::close(0);
         libc::close(1);
         libc::close(2);
-        let fd = libc::open(b"/dev/null\0".as_ptr(), libc::O_RDWR);
+        let fd = libc::open(b"/dev/null\0".as_ptr() as *const libc::c_char, libc::O_RDWR);
         if fd >= 0 {
             libc::dup2(fd, 0);
             libc::dup2(fd, 1);
