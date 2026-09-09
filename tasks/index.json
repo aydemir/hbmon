@@ -14,7 +14,7 @@
   {
     "id": "TASK-002",
     "title": "Release + crates.io yayını",
-    "status": "todo",
+    "status": "in_progress",
     "priority": "P1",
     "environment": "both",
     "labels": ["release", "distribution"],

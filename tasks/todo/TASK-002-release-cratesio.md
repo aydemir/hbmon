@@ -1,7 +1,7 @@
 ---
 id: TASK-002
 title: "Release + crates.io yayını"
-status: todo
+status: in_progress
 priority: P1
 created: 2026-09-09
 updated: 2026-09-09

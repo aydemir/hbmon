@@ -15,7 +15,7 @@
 | ID | Başlık | Status | Priority |
 |----|--------|--------|----------|
 | TASK-001 | Custom dep-missing patterns | done | P1 |
-| TASK-002 | Release + crates.io yayını | todo | P1 |
+| TASK-002 | Release + crates.io yayını | in_progress | P1 |
 | TASK-003 | Dogfooding + demo | todo | P2 |
 | TASK-004 | opencode-plugins migrasyonu | todo | P2 |
 | TASK-005 | wait --until erken dönüş | done | P1 |
