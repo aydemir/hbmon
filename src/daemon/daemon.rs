@@ -191,6 +191,14 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     let mut child = cmd.spawn().map_err(|e| format!("spawn {}: {}", cfg.cmd[0], e))?;
     let child_pid = child.id();
     let root_cmd = cfg.cmd.join(" ");
+    // cgroup v2 handle (once; path is stable for process lifetime).
+    // None on v1/Android/macOS — /proc accounting covers those.
+    let cg = crate::metrics::cgroup::locate(child_pid);
+    let mut oom_base: u64 = cg
+        .as_ref()
+        .and_then(crate::metrics::cgroup::read_stats)
+        .map(|s| s.oom_kills)
+        .unwrap_or(0);
 
     pidfile::write_pidfile(&cfg.pidfile, std::process::id())?;
 
@@ -398,6 +406,38 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
 
         if last_oom_poll.elapsed() >= Duration::from_secs(5) {
             last_oom_poll = Instant::now();
+            // cgroup v2 OOM: memory.events oom_kill delta (stronger than dmesg).
+            if let Some(ref c) = cg {
+                if let Some(st) = crate::metrics::cgroup::read_stats(c) {
+                    shared.totals.lock().unwrap().insert(
+                        "cgroup".to_string(),
+                        json!({
+                            "cpu_usec": st.cpu_usec,
+                            "mem_bytes": st.mem_bytes,
+                            "mem_peak": st.mem_peak,
+                            "pids": st.pids,
+                            "oom_kills": st.oom_kills,
+                        }),
+                    );
+                    if st.oom_kills > oom_base {
+                        oom_base = st.oom_kills;
+                        let ev = events::new_event(
+                            "oom_suspect",
+                            &cfg.uuid,
+                            events::kv(&[
+                                ("killed_by", json!("cgroup oom-killer")),
+                                ("oom_kills", json!(st.oom_kills)),
+                            ]),
+                        );
+                        logger.append(&ev);
+                        *shared.last_event.lock().unwrap() = ev.clone();
+                        *shared.oom_info.lock().unwrap() = Some(ev);
+                        if !alive {
+                            *shared.state.lock().unwrap() = State::OomKilled;
+                        }
+                    }
+                }
+            }
             let set: HashSet<u32> = pids.iter().copied().collect();
             let hits = oom::check(&set);
             if let Some(h) = hits.first() {
@@ -682,6 +722,9 @@ fn status_map(shared: &Shared, logger_path: &Path) -> serde_json::Map<String, Va
             "net_udp": json!(0),
         }),
     );
+    if let Some(cgv) = t.get("cgroup") {
+        m.insert("cgroup".to_string(), cgv.clone());
+    }
     let tree = {
         let pid = shared.root_pid.lock().unwrap().unwrap_or(0);
         if pid != 0 {
