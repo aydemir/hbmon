@@ -2,6 +2,7 @@
 id: TASK-002
 title: "Release + crates.io yayını"
 status: in_progress
+blocked_on: crates.io token (kullanıcıda)
 priority: P1
 created: 2026-09-09
 updated: 2026-09-09
