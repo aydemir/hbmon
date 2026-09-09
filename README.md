@@ -3,7 +3,7 @@
 LLM kodlama ajanları için tek ikilik, sıfır-runtime-bağımlılık derleme izleyici.
 Hangi harness kullanılırsa kullanılsın (OpenCode, Claude Code, Aider, …),
 hangi OS olursa olsun çalışır — v1: Linux'ta tam izleme (CPU/RSS/IO/FD),
-macOS'ta süreç gözetimi (metrikler best-effort).
+macOS'ta süreç gözetimi + RSS/FD/yol (CPU best-effort).
 
 ## Nasıl çalışır
 
