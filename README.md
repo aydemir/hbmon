@@ -32,6 +32,7 @@ hbmon wait --sock /tmp/hbmon-<uuid>.sock --timeout 600
 
 # Ön planda çalıştır (ilk satır handshake JSON)
 hbmon exec -- make -j8   # exit: 0 ok, 1 fail, 2 dep-missing
+hbmon exec --format json -- make -j8  # stderr son satır: JSON özet
 
 # Öldür / kapat
 hbmon kill --sock ... --signal TERM

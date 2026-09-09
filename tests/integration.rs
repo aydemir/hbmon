@@ -140,3 +140,20 @@ fn kill_terminates_build() {
     // killed build maps to failed(1)
     assert_eq!(w.status.code(), Some(1));
 }
+
+#[test]
+fn exec_json_summary_on_stderr() {
+    let out = hbmon()
+        .args(["exec", "--format", "json", "--", "sh", "-c", "exit 3"])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(1));
+    let err = String::from_utf8(out.stderr).unwrap();
+    let last = err.lines().last().expect("summary line");
+    let v: Value = serde_json::from_str(last).expect("summary is JSON");
+    assert_eq!(v["ev"], "exit");
+    assert_eq!(v["state"], "failed");
+    assert_eq!(v["code"], 1);
+    assert_eq!(v["raw_code"], 3);
+}

@@ -13,6 +13,9 @@ use crate::util::generate_uuid;
 pub struct ExecArgs {
     #[arg(long)]
     pub timeout_sec: Option<u64>,
+    /// Summary format on stderr (last line): human or json
+    #[arg(long, default_value = "human")]
+    pub format: String,
     #[arg(last = true)]
     pub cmd: Vec<String>,
 }
@@ -30,6 +33,7 @@ pub fn run(a: ExecArgs) -> Result<i32, String> {
         uuid, sock, log
     );
     std::io::stdout().flush().ok();
+    let start = std::time::Instant::now();
 
     let mut child = Command::new(&a.cmd[0])
         .args(&a.cmd[1..])
@@ -56,14 +60,31 @@ pub fn run(a: ExecArgs) -> Result<i32, String> {
     }
     let status = child.wait().map_err(|e| e.to_string())?;
     let raw = status.code().unwrap_or(1);
-    if dep_hit.is_some() {
-        if let Some((pid, cat)) = dep_hit {
-            eprintln!(
-                "hbmon: dep_missing hint pattern={} category={} (exit 2)",
-                pid, cat
-            );
-        }
-        return Ok(2);
+    let dur = start.elapsed().as_secs_f64();
+    let dep_info = dep_hit;
+    let (state, code) = if dep_info.is_some() {
+        ("dep_missing", 2)
+    } else if raw == 0 {
+        ("done", 0)
+    } else {
+        ("failed", 1)
+    };
+    if a.format == "json" {
+        eprintln!(
+            "{}",
+            serde_json::json!({
+                "v": 1, "ev": "exit", "uuid": uuid,
+                "code": code, "raw_code": raw,
+                "duration_sec": dur, "state": state,
+            })
+        );
+    } else if let Some((pat, cat)) = dep_info {
+        eprintln!(
+            "hbmon: dep_missing hint pattern={} category={} (exit 2)",
+            pat, cat
+        );
+    } else {
+        eprintln!("hbmon: {} in {:.1}s (exit {})", state, dur, code);
     }
-    Ok(if raw == 0 { 0 } else { 1 })
+    Ok(code)
 }
