@@ -63,3 +63,23 @@ fn extract_pid(line: &str) -> Option<u32> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn empty_watch_set_never_matches() {
+        assert!(check(&HashSet::new()).is_empty());
+    }
+
+    #[test]
+    fn extract_pid_from_oom_line() {
+        assert_eq!(
+            extract_pid("Out of memory: Killed process 1234 (cc) total-vm:1000"),
+            Some(1234)
+        );
+        assert_eq!(extract_pid("nothing relevant here"), None);
+    }
+}
