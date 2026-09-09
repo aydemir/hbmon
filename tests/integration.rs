@@ -4,15 +4,99 @@
 
 use assert_cmd::Command;
 use serde_json::Value;
-use std::path::PathBuf;
 use std::time::Duration;
 
 fn uuid(tag: &str) -> String {
     format!("itest-{}-{}", std::process::id(), tag)
 }
 
-fn sock_for(id: &str) -> PathBuf {
-    PathBuf::from(format!("/tmp/hbmon-{}.sock", id))
+/// Daemon'un bu uuid için dinlediği adres (metin): unix'te
+/// `/tmp/hbmon-<id>.sock`, Windows'ta `\\.\pipe\hbmon-<id>`.
+/// Test `--uuid <id>` verir; daemon varsayılan adresi türetir.
+fn sock_for(id: &str) -> String {
+    hbmon::platform::paths::sock_display(&hbmon::platform::paths::default_sock(id))
+}
+
+/// Platform uyku komutu: `["sleep","N"]` / powershell `Start-Sleep`.
+fn sleep_cmd(secs: u64) -> Vec<String> {
+    #[cfg(unix)]
+    {
+        vec!["sleep".to_string(), secs.to_string()]
+    }
+    #[cfg(windows)]
+    {
+        vec![
+            "powershell".to_string(),
+            "-NoProfile".to_string(),
+            "-Command".to_string(),
+            format!("Start-Sleep -Seconds {}", secs),
+        ]
+    }
+}
+
+/// Platform shell: `sh -c <script>` / `powershell -Command <script>`.
+fn shell_cmd(script: &str) -> Vec<String> {
+    #[cfg(unix)]
+    {
+        vec!["sh".to_string(), "-c".to_string(), script.to_string()]
+    }
+    #[cfg(windows)]
+    {
+        vec![
+            "powershell".to_string(),
+            "-NoProfile".to_string(),
+            "-Command".to_string(),
+            script.to_string(),
+        ]
+    }
+}
+
+/// stderr'a dep-missing satırı basıp `code` ile çıkan script.
+fn dep_script(code: i32) -> String {
+    #[cfg(unix)]
+    {
+        format!("echo \"Cannot find module 'foo'\" >&2; exit {}", code)
+    }
+    #[cfg(windows)]
+    {
+        format!(
+            "[Console]::Error.WriteLine(\"Cannot find module 'foo'\"); exit {}",
+            code
+        )
+    }
+}
+
+/// Dep satırı basıp uykuya yatan script (erken-dönüş testi).
+fn dep_then_sleep(secs: u64) -> String {
+    #[cfg(unix)]
+    {
+        format!("echo \"Cannot find module 'x'\" >&2; sleep {}", secs)
+    }
+    #[cfg(windows)]
+    {
+        format!(
+            "[Console]::Error.WriteLine(\"Cannot find module 'x'\"); Start-Sleep -Seconds {}",
+            secs
+        )
+    }
+}
+
+fn watch_args(id: &str, program: Vec<String>) -> Vec<String> {
+    let mut a = vec![
+        "watch".to_string(),
+        "--detach".to_string(),
+        "--uuid".to_string(),
+        id.to_string(),
+        "--".to_string(),
+    ];
+    a.extend(program);
+    a
+}
+
+fn exec_args(program: Vec<String>) -> Vec<String> {
+    let mut a = vec!["exec".to_string(), "--".to_string()];
+    a.extend(program);
+    a
 }
 
 fn hbmon() -> Command {
@@ -42,7 +126,7 @@ fn wait_for_ready(sock: &str) {
 #[test]
 fn exec_handshake_and_exit_zero() {
     let out = hbmon()
-        .args(["exec", "--", "echo", "hi"])
+        .args(exec_args(vec!["echo".to_string(), "hi".to_string()]))
         .timeout(Duration::from_secs(30))
         .output()
         .unwrap();
@@ -58,13 +142,7 @@ fn exec_handshake_and_exit_zero() {
 #[test]
 fn exec_dep_missing_exit_two() {
     let out = hbmon()
-        .args([
-            "exec",
-            "--",
-            "sh",
-            "-c",
-            "echo \"Cannot find module 'foo'\" >&2; exit 1",
-        ])
+        .args(exec_args(shell_cmd(&dep_script(1))))
         .timeout(Duration::from_secs(30))
         .output()
         .unwrap();
@@ -74,11 +152,10 @@ fn exec_dep_missing_exit_two() {
 #[test]
 fn watch_status_wait_full_cycle() {
     let id = uuid("cycle");
-    let sock = sock_for(&id);
-    let s = sock.to_str().unwrap().to_string();
+    let s = sock_for(&id);
 
     let out = hbmon()
-        .args(["watch", "--detach", "--uuid", &id, "--", "sleep", "3"])
+        .args(watch_args(&id, sleep_cmd(3)))
         .timeout(Duration::from_secs(30))
         .output()
         .unwrap();
@@ -112,11 +189,10 @@ fn watch_status_wait_full_cycle() {
 #[test]
 fn kill_terminates_build() {
     let id = uuid("kill");
-    let sock = sock_for(&id);
-    let s = sock.to_str().unwrap().to_string();
+    let s = sock_for(&id);
 
     let out = hbmon()
-        .args(["watch", "--detach", "--uuid", &id, "--", "sleep", "60"])
+        .args(watch_args(&id, sleep_cmd(60)))
         .timeout(Duration::from_secs(30))
         .output()
         .unwrap();
@@ -144,7 +220,11 @@ fn kill_terminates_build() {
 #[test]
 fn exec_json_summary_on_stderr() {
     let out = hbmon()
-        .args(["exec", "--format", "json", "--", "sh", "-c", "exit 3"])
+        .args({
+            let mut a = vec!["exec".to_string(), "--format".to_string(), "json".to_string(), "--".to_string()];
+            a.extend(shell_cmd("exit 3"));
+            a
+        })
         .timeout(Duration::from_secs(30))
         .output()
         .unwrap();
@@ -161,19 +241,9 @@ fn exec_json_summary_on_stderr() {
 #[test]
 fn wait_until_dep_missing_returns_early() {
     let id = uuid("until-dep");
-    let sock = sock_for(&id);
-    let s = sock.to_str().unwrap().to_string();
+    let s = sock_for(&id);
     let out = hbmon()
-        .args([
-            "watch",
-            "--detach",
-            "--uuid",
-            &id,
-            "--",
-            "sh",
-            "-c",
-            "echo \"Cannot find module 'x'\" >&2; sleep 30",
-        ])
+        .args(watch_args(&id, shell_cmd(&dep_then_sleep(30))))
         .timeout(Duration::from_secs(30))
         .output()
         .unwrap();
@@ -212,10 +282,9 @@ fn wait_until_dep_missing_returns_early() {
 #[test]
 fn wait_until_stall_suspect_returns_early() {
     let id = uuid("until-stall");
-    let sock = sock_for(&id);
-    let s = sock.to_str().unwrap().to_string();
+    let s = sock_for(&id);
     let out = hbmon()
-        .args(["watch", "--detach", "--uuid", &id, "--", "sleep", "45"])
+        .args(watch_args(&id, sleep_cmd(45)))
         .timeout(Duration::from_secs(30))
         .output()
         .unwrap();

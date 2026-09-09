@@ -2,11 +2,12 @@ pub mod events;
 
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use serde_json::Value;
+
+use crate::platform::perm::{secure_fix, SecureMode};
 
 const MAX_BYTES: u64 = 100 * 1024 * 1024; // 100MB cap (RFC 5.2.1)
 
@@ -27,10 +28,10 @@ impl EventLogger {
         let file = OpenOptions::new()
             .create(true)
             .append(true)
-            .mode(0o600)
+            .secure_mode(0o600)
             .open(path)
             .map_err(|e| format!("open log {}: {}", path.display(), e))?;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).ok();
+        secure_fix(path);
         Ok(Self {
             path: path.to_path_buf(),
             file: Mutex::new(file),
@@ -67,7 +68,7 @@ impl EventLogger {
                 if let Ok(nf) = OpenOptions::new()
                     .write(true)
                     .truncate(true)
-                    .mode(0o600)
+                    .secure_mode(0o600)
                     .open(&self.path)
                 {
                     *f = nf;

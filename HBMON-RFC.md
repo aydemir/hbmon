@@ -193,7 +193,7 @@ hbmon watch --pid $$ --detach -- make -j8
 |---|---|---|---|
 | Linux | `setsid(2)` | ✅ | Standart POSIX pattern |
 | macOS | `setsid(2)` | ✅ | Aynı, `libc`'de mevcut |
-| Windows | ❌ | — | `CreateProcess` + `DETACHED_PROCESS` flag, v2'de |
+| Windows | yok (Job Object + self re-spawn) | ✅ (ham `CreateProcessW`) | `DETACHED_PROCESS` + `CREATE_NEW_PROCESS_GROUP` + `BREAKAWAY`; stdio NUL; handle devralma yok (`bInheritHandles=FALSE`, TASK-006) |
 
 ### 4.4 Rust Implementation İskeleti
 
@@ -247,6 +247,11 @@ hbmon kill --pid 12345 --signal SIGTERM
 ```
 
 Bu UDS üzerinden `{"op":"kill","signal":15}` gönderir; daemon `kill(-pgid, sig)` ile **tüm süreç grubunu** sonlandırır.
+
+**Windows notu (TASK-006):** graceful grup sinyali yok — `Term` de `Kill` de
+`TerminateJobObject` ile sonlanır (build `exit 1` → `failed` eşlenir).
+Job atanamazsa fallback: Toolhelp ağaç yürüyüşü + yaprak-önce
+`TerminateProcess` (`kill_tree`).
 
 ---
 
@@ -756,7 +761,12 @@ pub trait ProcessInspector: Send + Sync {
 
 - **Linux:** doğrudan `/proc` parsing (bağımlılıksız, best-effort).
 - **macOS:** `libproc` FFI (`proc_listpids`, `proc_pidinfo`); metrikler v1'de best-effort.
-- **Windows (v2):** named pipe + `CreateProcess`/`DETACHED_PROCESS`; trait'e yeni impl olarak eklenir, daemon/IPC/health tarafına OS-özel kod sızmaz.
+- **Windows (TASK-006 ile gerçeklendi):** ham Win32 FFI, yeni crate yok —
+  ağaç için Toolhelp snapshot, RSS için `GetProcessMemoryInfo`, CPU ham
+  zaman için `GetProcessTimes` (centisecond → `CpuTracker` aynen),
+  IO sayaçları için `GetProcessIoCounters`, fd için `GetProcessHandleCount`;
+  transport named pipe (`\\.\pipe\hbmon-<uuid>`), wire format v1 değişmez.
+  Belgeli eksikler: `net_tcp/net_udp` = 0, `cmdline` = exe yolu (argv değil).
 
 CPU yüzdesi her zaman delta gerektirir → `CpuTracker` (jiffies farkı / geçen süre, 100Hz varsayımı).
 
@@ -814,7 +824,8 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 
 ## 13. Güvenlik, Sınırlamalar ve Yarış Koşulları
 
-- **Dosya izinleri:** pid/sock/jsonl/out hepsi `0600`; symlink açılışta reddedilir (`O_EXCL` + sahiplik kontrolü).
+- **Dosya izinleri:** pid/sock/jsonl/out hepsi `0600` (Windows: ACL
+  varsayılanı + `%TEMP%`; pipe `\\.\pipe\hbmon-<uuid>`); symlink açılışta reddedilir (`O_EXCL` + sahiplik kontrolü).
 - **Path injection:** `..` içeren path'ler reddedilir.
 - **Resource limit:** daemon ~10MB RAM, idle <%1 CPU hedefi.
 - **Çift spawn:** canlı socket varsa `MONITOR_ALREADY_EXISTS`.
@@ -843,7 +854,9 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 
 ### 14.3 v2
 
-- [ ] Windows (named pipe), multi-build first-class
+- [x] Windows portu — TASK-006 (named pipe transport + Win32 inspector +
+  Job-Object detach/kill), `windows-latest` CI'da; 45 unit + 7 integration yeşil
+- [ ] Multi-build first-class (v1'de scan ile idare)
 - [ ] Prometheus exporter, Web UI
 
 ### 14.4 v3

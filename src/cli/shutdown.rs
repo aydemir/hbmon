@@ -3,7 +3,7 @@ use serde_json::json;
 use std::path::PathBuf;
 
 use super::resolve_sock;
-use crate::ipc::uds::send_request;
+use crate::ipc::send_request;
 use crate::util::generate_uuid;
 
 #[derive(Debug, Parser)]

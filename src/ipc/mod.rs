@@ -1,6 +1,6 @@
 pub mod codec;
 pub mod protocol;
-pub mod uds;
+pub mod transport;
 
 pub use protocol::{Request, Response, error_response};
-pub use uds::{send_request, serve};
+pub use transport::{can_connect, send_request, serve};

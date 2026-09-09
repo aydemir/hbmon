@@ -12,7 +12,6 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::io::{BufRead, BufReader};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -23,16 +22,18 @@ use crate::health::{dep_missing, oom, stall::StallDetector, timeout::TimeoutWatc
 use crate::ipc::{error_response, protocol::ok_response};
 use crate::metrics::CpuTracker;
 use crate::platform::inspector;
+use crate::platform::paths::{self, SockAddr};
+use crate::platform::perm::{secure_fix, SecureMode};
+use crate::platform::signal::{kill_pgroup, Sig};
 use crate::proc::collect_descendants;
 use crate::util::time::{now_iso, now_secs};
 
 use super::pidfile;
-use super::signals::install_daemon_posture;
 
 #[derive(Debug, Clone)]
 pub struct MonitorConfig {
     pub uuid: String,
-    pub sock: PathBuf,
+    pub sock: SockAddr,
     pub log: PathBuf,
     pub pidfile: PathBuf,
     pub out: PathBuf,
@@ -51,13 +52,13 @@ impl MonitorConfig {
         timeout_sec: Option<u64>,
         label: Option<String>,
     ) -> Self {
-        let sock = sock.unwrap_or_else(|| PathBuf::from(format!("/tmp/hbmon-{}.sock", uuid)));
-        let log = log.unwrap_or_else(|| PathBuf::from(format!("/tmp/hbmon-{}.jsonl", uuid)));
-        let pidfile = PathBuf::from(format!("/tmp/hbmon-{}.pid", uuid));
-        let out = PathBuf::from(format!("/tmp/hbmon-{}.out", uuid));
+        let sock = sock.map(paths::from_explicit).unwrap_or_else(|| paths::default_sock(&uuid));
+        let log = log.unwrap_or_else(|| paths::default_log(&uuid));
+        let pidfile = paths::default_pidfile(&uuid);
+        let out = paths::default_out(&uuid);
         // Spawn cwd'sini dondur: daemon kendisi /'ye taşınır ama
         // çocuk build, watch'in verildiği dizinde çalışmalıdır.
-        let workdir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/tmp"));
+        let workdir = paths::default_workdir();
         Self {
             uuid,
             sock,
@@ -95,64 +96,26 @@ struct Shared {
 
 /// Public entry from CLI: optionally daemonize, then run monitor.
 pub fn spawn_watch(cfg: MonitorConfig, detach: bool) -> Result<MonitorConfig, String> {
-    if cfg.sock.exists() {
+    if paths::sock_exists(&cfg.sock) {
         // live monitor? refuse double-spawn (RFC 13.2.1); stale socket? remove
-        if std::os::unix::net::UnixStream::connect(&cfg.sock).is_ok() {
+        if crate::ipc::can_connect(&cfg.sock) {
             return Err(format!(
                 "MONITOR_ALREADY_EXISTS: {} is live; use a fresh --uuid",
-                cfg.sock.display()
+                paths::sock_display(&cfg.sock)
             ));
         } else {
-            std::fs::remove_file(&cfg.sock).ok();
+            paths::sock_remove(&cfg.sock);
         }
     }
     if !detach {
         run_daemon(cfg.clone())?;
         return Ok(cfg);
     }
-    daemonize()?;
-    install_daemon_posture();
-    let _ = std::env::set_current_dir("/");
-    unsafe { libc::umask(0o077) };
+    crate::platform::detach::detach()?;
     match run_daemon(cfg.clone()) {
         Ok(_) => std::process::exit(0),
         Err(_) => std::process::exit(3),
     }
-}
-
-fn daemonize() -> Result<(), String> {
-    unsafe {
-        let p1 = libc::fork();
-        if p1 < 0 {
-            return Err("fork(1) failed".to_string());
-        }
-        if p1 > 0 {
-            std::process::exit(0);
-        }
-        if libc::setsid() == -1 {
-            return Err("setsid failed".to_string());
-        }
-        let p2 = libc::fork();
-        if p2 < 0 {
-            return Err("fork(2) failed".to_string());
-        }
-        if p2 > 0 {
-            std::process::exit(0);
-        }
-        libc::close(0);
-        libc::close(1);
-        libc::close(2);
-        let fd = libc::open(b"/dev/null\0".as_ptr() as *const libc::c_char, libc::O_RDWR);
-        if fd >= 0 {
-            libc::dup2(fd, 0);
-            libc::dup2(fd, 1);
-            libc::dup2(fd, 2);
-            if fd > 2 {
-                libc::close(fd);
-            }
-        }
-    }
-    Ok(())
 }
 
 pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
@@ -169,10 +132,10 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     let out_file = OpenOptions::new()
         .create(true)
         .append(true)
-        .mode(0o600)
+        .secure_mode(0o600)
         .open(&cfg.out)
         .map_err(|e| format!("open out {}: {}", cfg.out.display(), e))?;
-    std::fs::set_permissions(&cfg.out, std::fs::Permissions::from_mode(0o600)).ok();
+    secure_fix(&cfg.out);
     let err_file = out_file.try_clone().map_err(|e| e.to_string())?;
 
     let mut cmd = Command::new(&cfg.cmd[0]);
@@ -181,15 +144,10 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::from(out_file));
     cmd.stderr(Stdio::from(err_file));
-    unsafe {
-        use std::os::unix::process::CommandExt;
-        cmd.pre_exec(|| {
-            libc::setpgid(0, 0);
-            Ok(())
-        });
-    }
+    crate::platform::detach::child_group(&mut cmd);
     let mut child = cmd.spawn().map_err(|e| format!("spawn {}: {}", cfg.cmd[0], e))?;
     let child_pid = child.id();
+    crate::platform::detach::child_spawned(&child);
     let root_cmd = cfg.cmd.join(" ");
     // cgroup v2 handle (once; path is stable for process lifetime).
     // None on v1/Android/macOS — /proc accounting covers those.
@@ -227,7 +185,7 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         "ready",
         &cfg.uuid,
         events::kv(&[
-            ("sock", json!(cfg.sock.to_string_lossy())),
+            ("sock", json!(paths::sock_display(&cfg.sock))),
             ("log", json!(cfg.log.to_string_lossy())),
             ("root_pid", json!(child_pid)),
             ("cmd", json!(root_cmd)),
@@ -285,10 +243,12 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         // (`let _ = pct`) while bulk cpu_pct is always 0.0, so tot_cpu
         // stayed 0 and the stall detector lost its CPU leg.
         let mut cpu_by_pid: HashMap<u32, f32> = HashMap::new();
-        #[cfg(target_os = "linux")]
+        // CPU deltas: CpuTracker converts raw ticks -> % per pid
+        // (Linux jiffies, Windows FILETIME centis — same 100Hz unit).
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
         {
             for &p in &pids {
-                if let Some(j) = crate::proc::linux::cpu_jiffies(p) {
+                if let Some(j) = crate::proc::cpu_time(p) {
                     cpu_by_pid.insert(p, tracker.update(p, j));
                 }
             }
@@ -458,10 +418,10 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         }
 
         if watchdog.expired() {
-            kill_pgroup(child_pid, libc::SIGTERM);
+            kill_pgroup(child_pid, Sig::Term);
             std::thread::sleep(Duration::from_secs(5));
             if insp.is_alive(child_pid) {
-                kill_pgroup(child_pid, libc::SIGKILL);
+                kill_pgroup(child_pid, Sig::Kill);
             }
             let _ = child.wait();
             *shared.state.lock().unwrap() = State::Timeout;
@@ -553,7 +513,7 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         std::thread::sleep(Duration::from_millis(500));
     }
     pidfile::remove(&cfg.pidfile);
-    std::fs::remove_file(&cfg.sock).ok();
+    paths::sock_remove(&cfg.sock);
     Ok(())
 }
 
@@ -577,13 +537,6 @@ fn scan_out_for_dep(out: &Path) -> Option<DepMatch> {
         }
     }
     None
-}
-
-#[allow(dead_code)]
-fn kill_pgroup(pid: u32, sig: i32) {
-    unsafe {
-        libc::kill(-(pid as i32), sig);
-    }
 }
 
 fn dispatch(req: Value, shared: &Shared, logger_path: &Path) -> Value {
@@ -684,14 +637,12 @@ fn dispatch(req: Value, shared: &Shared, logger_path: &Path) -> Value {
             }
         }
         "kill" => {
-            let sig = req.get("signal").and_then(|v| v.as_i64()).unwrap_or(15) as i32;
+            let sig = Sig::from_num(req.get("signal").and_then(|v| v.as_i64()).unwrap_or(15));
             let pid = shared.root_pid.lock().unwrap().unwrap_or(0);
             if pid == 0 {
                 return error_response(&id, "BUILD_NOT_FOUND", "no root pid");
             }
-            unsafe {
-                libc::kill(-(pid as i32), sig);
-            }
+            kill_pgroup(pid, sig);
             let mut m = serde_json::Map::new();
             m.insert("killed".to_string(), json!(true));
             ok_response(&id, m)
@@ -701,14 +652,10 @@ fn dispatch(req: Value, shared: &Shared, logger_path: &Path) -> Value {
             let force = req.get("force").and_then(|v| v.as_bool()).unwrap_or(false);
             let pid = shared.root_pid.lock().unwrap().unwrap_or(0);
             if pid != 0 {
-                unsafe {
-                    libc::kill(-(pid as i32), libc::SIGTERM);
-                }
+                kill_pgroup(pid, Sig::Term);
                 if force {
                     std::thread::sleep(Duration::from_millis(200));
-                    unsafe {
-                        libc::kill(-(pid as i32), libc::SIGKILL);
-                    }
+                    kill_pgroup(pid, Sig::Kill);
                 }
             }
             let mut m = serde_json::Map::new();

@@ -9,6 +9,14 @@ pub struct OomEvent {
     pub text: String,
 }
 
+// Windows v1: OOM sinyali yok (belgeli eksik, TASK-006).
+// "Best-effort, never fatal" ilkesi — boş dön, daemon etkilenmez.
+#[cfg(windows)]
+pub fn check(_watched: &HashSet<u32>) -> Vec<OomEvent> {
+    vec![]
+}
+
+#[cfg(not(windows))]
 pub fn check(watched: &HashSet<u32>) -> Vec<OomEvent> {
     if watched.is_empty() {
         return vec![];
@@ -48,6 +56,7 @@ pub fn check(watched: &HashSet<u32>) -> Vec<OomEvent> {
     hits
 }
 
+#[cfg_attr(windows, allow(dead_code))]
 fn extract_pid(line: &str) -> Option<u32> {
     // patterns: "Killed process 1234 (cc)", "pid 1234,"
     for (i, w) in line.split_whitespace().enumerate() {

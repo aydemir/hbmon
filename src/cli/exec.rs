@@ -7,6 +7,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 
 use crate::health::dep_missing;
+use crate::platform::paths;
 use crate::util::generate_uuid;
 
 #[derive(Debug, Parser)]
@@ -25,12 +26,18 @@ pub fn run(a: ExecArgs) -> Result<i32, String> {
         return Err("usage: hbmon exec -- <cmd> [args...]".to_string());
     }
     let uuid = generate_uuid();
-    let sock = format!("/tmp/hbmon-{}.sock", uuid);
-    let log = format!("/tmp/hbmon-{}.jsonl", uuid);
-    // handshake FIRST so LLM can grab it even if build floods output
+    let sock = paths::default_sock(&uuid);
+    let log = paths::default_log(&uuid);
+    // handshake FIRST so LLM can grab it even if build floods output.
+    // serde_json ile serialize edilir: Windows pipe yolu (`\\.\pipe\…`)
+    // tersbölüleri manuel format ile geçersiz JSON üretirdi.
     println!(
-        "{{\"v\":1,\"ev\":\"ready\",\"uuid\":\"{}\",\"sock\":\"{}\",\"log\":\"{}\"}}",
-        uuid, sock, log
+        "{}",
+        serde_json::json!({
+            "v": 1, "ev": "ready", "uuid": uuid,
+            "sock": paths::sock_display(&sock),
+            "log": log.to_string_lossy(),
+        })
     );
     std::io::stdout().flush().ok();
     let start = std::time::Instant::now();

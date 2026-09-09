@@ -2,8 +2,9 @@
 
 LLM kodlama ajanları için tek ikilik, sıfır-runtime-bağımlılık derleme izleyici.
 Hangi harness kullanılırsa kullanılsın (OpenCode, Claude Code, Aider, …),
-hangi OS olursa olsun çalışır — v1: Linux'ta tam izleme (CPU/RSS/IO/FD),
-macOS'ta süreç gözetimi + RSS/FD/yol (CPU best-effort).
+hangi OS olursa olsun çalışır — Linux'ta tam izleme (CPU/RSS/IO/FD),
+macOS'ta süreç gözetimi + RSS/FD/yol (CPU best-effort), Windows'ta tam
+izleme (Toolhelp+RSS/IO/handle; net best-effort, cmdline = exe yolu).
 
 ## Nasıl çalışır
 
@@ -16,6 +17,7 @@ macOS'ta süreç gözetimi + RSS/FD/yol (CPU best-effort).
 ```bash
 cargo install --git https://github.com/aydemir/hbmon
 # veya kaynaktan: cargo build --release  # strip'li ikilik ~2.4MB
+# Windows: aynısı → target\release\hbmon.exe (named pipe transport)
 ```
 
 ## Kullanım

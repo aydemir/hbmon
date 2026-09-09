@@ -8,6 +8,8 @@ pub mod watch;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+use crate::platform::paths::{self, SockAddr};
+
 /// hbmon — harness-independent build monitor (RFC v0.1)
 #[derive(Debug, Parser)]
 #[command(name = "hbmon", version, about = "Harness-independent build monitor")]
@@ -53,40 +55,25 @@ pub fn dispatch(cli: Cli) -> Result<i32, String> {
     }
 }
 
-/// Resolve --sock > $HBMON_SOCK > newest /tmp/hbmon-*.sock (RFC Katman 3).
-pub fn resolve_sock(explicit: Option<PathBuf>) -> Result<PathBuf, String> {
+/// Resolve --sock > $HBMON_SOCK > newest convention socket (RFC Katman 3).
+pub fn resolve_sock(explicit: Option<PathBuf>) -> Result<SockAddr, String> {
     if let Some(p) = explicit {
-        return Ok(p);
+        return Ok(paths::from_explicit(p));
     }
     if let Ok(e) = std::env::var("HBMON_SOCK") {
         if !e.is_empty() {
-            return Ok(PathBuf::from(e));
+            return Ok(paths::from_env(&e));
         }
     }
-    // convention scan: newest sock
-    let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
-    if let Ok(dir) = std::fs::read_dir("/tmp") {
-        for e in dir.flatten() {
-            let name = e.file_name().to_string_lossy().to_string();
-            if name.starts_with("hbmon-") && name.ends_with(".sock") {
-                let p = e.path();
-                let mtime = e.metadata().and_then(|m| m.modified()).ok();
-                if let Some(mt) = mtime {
-                    if best.as_ref().map(|(t, _)| mt > *t).unwrap_or(true) {
-                        best = Some((mt, p));
-                    }
-                }
-            }
-        }
-    }
-    best.map(|(_, p)| p)
+    // convention scan: newest sock (unix); windows M2'de pipe enumerate.
+    paths::scan_newest_sock()
         .ok_or_else(|| "no monitor found: pass --sock or set HBMON_SOCK".to_string())
 }
 
 fn run_cleanup(a: CleanupArgs) -> Result<i32, String> {
     let now = std::time::SystemTime::now();
     let mut removed = 0u32;
-    if let Ok(dir) = std::fs::read_dir("/tmp") {
+    if let Ok(dir) = std::fs::read_dir(paths::scan_dir()) {
         for e in dir.flatten() {
             let name = e.file_name().to_string_lossy().to_string();
             if !(name.starts_with("hbmon-")
@@ -106,7 +93,7 @@ fn run_cleanup(a: CleanupArgs) -> Result<i32, String> {
                 .unwrap_or(false);
             // sockets: only remove if nobody listens (stale)
             if name.ends_with(".sock")
-                && std::os::unix::net::UnixStream::connect(e.path()).is_ok()
+                && crate::ipc::can_connect(&paths::from_explicit(e.path()))
             {
                 continue;
             }

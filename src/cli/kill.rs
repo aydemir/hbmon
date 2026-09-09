@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use super::resolve_sock;
 use crate::daemon::signals::parse_signal;
-use crate::ipc::uds::send_request;
+use crate::ipc::send_request;
 use crate::util::generate_uuid;
 use serde_json::json;
 
@@ -21,16 +21,14 @@ pub fn run(a: KillArgs) -> Result<i32, String> {
     let sig = parse_signal(&a.signal)?;
     if let Some(pid) = a.pid {
         // direct kill without UDS: whole process group (RFC 4.5)
-        unsafe {
-            if libc::kill(-(pid as i32), sig) != 0 {
-                return Err(format!("kill({}) failed", pid));
-            }
+        if !crate::platform::signal::kill_pgroup(pid, sig) {
+            return Err(format!("kill({}) failed", pid));
         }
         println!("{{\"killed\":true,\"pid\":{}}}", pid);
         return Ok(0);
     }
     let sock = resolve_sock(a.sock)?;
-    let req = json!({"v":1,"op":"kill","id":generate_uuid(),"signal":sig});
+    let req = json!({"v":1,"op":"kill","id":generate_uuid(),"signal":sig.to_num()});
     let resp = send_request(&sock, &req, 10)?;
     println!("{}", serde_json::to_string(&resp).unwrap());
     Ok(0)

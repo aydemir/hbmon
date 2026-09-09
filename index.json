@@ -58,7 +58,7 @@
       "file": "src/platform/mod.rs",
       "docs": "HBMON-RFC.md",
       "tests": null,
-      "status": "partial-macos"
+      "status": "stable"
     }
   ]
 }

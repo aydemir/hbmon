@@ -9,10 +9,10 @@ pub struct WatchArgs {
     /// Monitor id (generated if absent)
     #[arg(long)]
     pub uuid: Option<String>,
-    /// Socket path (default /tmp/hbmon-<uuid>.sock)
+    /// Socket path (default: platform convention, see platform::paths)
     #[arg(long)]
     pub sock: Option<PathBuf>,
-    /// Event log path (default /tmp/hbmon-<uuid>.jsonl)
+    /// Event log path (default: platform convention, see platform::paths)
     #[arg(long)]
     pub log: Option<PathBuf>,
     /// Parent pid hint (validation/logging only; daemon is detached anyway)
@@ -41,11 +41,15 @@ pub fn run(a: WatchArgs) -> Result<i32, String> {
     if a.detach {
         // spawn_watch double-forks; the caller (LLM shell) returns immediately.
         // Print handshake BEFORE forking so the LLM captures uuid/sock/log.
+        // serde_json ile serialize edilir: Windows pipe yolu tersbölüleri
+        // manuel format ile geçersiz JSON üretirdi (bkz. exec.rs).
         println!(
-            "{{\"v\":1,\"ev\":\"ready\",\"uuid\":\"{}\",\"sock\":\"{}\",\"log\":\"{}\"}}",
-            cfg.uuid,
-            cfg.sock.display(),
-            cfg.log.display()
+            "{}",
+            serde_json::json!({
+                "v": 1, "ev": "ready", "uuid": cfg.uuid,
+                "sock": crate::platform::paths::sock_display(&cfg.sock),
+                "log": cfg.log.to_string_lossy(),
+            })
         );
         use std::io::Write;
         let _ = std::io::stdout().flush();

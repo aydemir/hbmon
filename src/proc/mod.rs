@@ -1,7 +1,10 @@
+#[cfg(unix)]
 pub mod linux;
 pub mod macos;
 pub mod metrics;
 pub mod tree;
+#[cfg(target_os = "windows")]
+pub mod windows;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -47,7 +50,25 @@ pub trait ProcessInspector: Send + Sync {
 }
 
 /// Collect full descendant set (BFS) with cycle guard.
-pub fn collect_descendants(
+
+/// Raw CPU time in `CpuTracker` units (ticks at 100Hz).
+/// Linux: /proc jiffies; Windows: FILETIME centiseconds; else: None
+/// (caller falls back to instantaneous `cpu_pct`, e.g. macOS 0.0).
+pub fn cpu_time(pid: u32) -> Option<u64> {
+    #[cfg(target_os = "linux")]
+    {
+        linux::cpu_jiffies(pid)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        windows::cpu_centis(pid)
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    {
+        let _ = pid;
+        None
+    }
+}pub fn collect_descendants(
     insp: &dyn ProcessInspector,
     root: u32,
     max: usize,
