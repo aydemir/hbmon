@@ -14,7 +14,8 @@ macOS'ta süreç gözetimi + RSS/FD/yol (CPU best-effort).
 ## Kurulum
 
 ```bash
-cargo install --path .   # veya: cargo build --release
+cargo install --git https://github.com/aydemir/hbmon
+# veya kaynaktan: cargo build --release  # strip'li ikilik ~2.4MB
 ```
 
 ## Kullanım
