@@ -68,12 +68,10 @@ fn unix_detach() -> Result<(), String> {
 /// Child'ı kendi process grubunda başlat (sonradan grupça kill için).
 pub fn child_group(cmd: &mut std::process::Command) {
     #[cfg(unix)]
-    {
+    unsafe {
         use std::os::unix::process::CommandExt;
         cmd.pre_exec(|| {
-            unsafe {
-                libc::setpgid(0, 0);
-            }
+            libc::setpgid(0, 0);
             Ok(())
         });
     }
