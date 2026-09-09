@@ -26,14 +26,14 @@
   {
     "id": "TASK-003",
     "title": "Dogfooding + demo",
-    "status": "in_progress",
+    "status": "done",
     "priority": "P2",
     "environment": "both",
     "labels": ["demo", "adoption"],
     "depends_on": [],
     "created": "2026-09-09",
     "updated": "2026-09-09",
-    "file": "tasks/todo/TASK-003-dogfooding-demo.md"
+    "file": "tasks/done/TASK-003-dogfooding-demo.md"
   },
   {
     "id": "TASK-004",

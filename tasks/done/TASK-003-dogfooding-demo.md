@@ -1,7 +1,7 @@
 ---
 id: TASK-003
 title: "Dogfooding + demo"
-status: in_progress
+status: done
 priority: P2
 created: 2026-09-09
 updated: 2026-09-09
