@@ -159,7 +159,7 @@
   {
     "id": "TASK-011",
     "title": "run_daemon bolme",
-    "status": "todo",
+    "status": "done",
     "priority": "P3",
     "environment": "both",
     "labels": [
@@ -172,6 +172,21 @@
     ],
     "created": "2026-09-09",
     "updated": "2026-09-09",
-    "file": "tasks/todo/TASK-011-run-daemon-split.md"
+    "file": "tasks/done/TASK-011-run-daemon-split.md"
+  },
+  {
+    "id": "TASK-012",
+    "title": "test uuid cakisma sertlestirme",
+    "status": "todo",
+    "priority": "P3",
+    "environment": "both",
+    "labels": [
+      "tests",
+      "flake"
+    ],
+    "depends_on": [],
+    "created": "2026-09-10",
+    "updated": "2026-09-10",
+    "file": "tasks/todo/TASK-012-test-uuid-flake.md"
   }
 ]

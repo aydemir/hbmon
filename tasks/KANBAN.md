@@ -24,4 +24,5 @@
 | TASK-008 | Dead-dep + RFC drift temizligi | done | P2 |
 | TASK-009 | Incremental dep-scan (B1 perf) | done | P1 |
 | TASK-010 | DepMatch birlestirme | done | P3 |
-| TASK-011 | run_daemon bolme | todo | P3 |
+| TASK-011 | run_daemon bolme | done | P3 |
+| TASK-012 | test uuid cakisma sertlestirme | todo | P3 |

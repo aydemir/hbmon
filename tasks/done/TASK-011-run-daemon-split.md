@@ -1,7 +1,7 @@
 ---
 id: TASK-011
 title: "run_daemon bolme (400 satir hotspot + Shared mutex corbasi)"
-status: todo
+status: done
 priority: P3
 created: 2026-09-09
 updated: 2026-09-09
@@ -41,3 +41,9 @@ merge-catisma surtunme noktasidir. Davranis korunarak okunabilirligi yukseltmek.
 
 - `cargo test --locked -j2` yesil + CI yesil
 - `run_daemon` <150 satir, loop govdesi ayri fonksiyon
+
+## Gerceklesme Notu (2026-09-10)
+
+- `run_daemon` 400 -> 115 satir: tick govdesi `poll_once(&mut PollCtx, &mut Poll) -> bool`'e tasindi; davranis birebir korundu.
+- `Shared` 15 Mutex birlestirilmedi: UDS thread + tick dongusu eszamanli erisiyor, kilitler kisa ve asla ic ice degil; tek mutex status okumalarini tick yazilarinin arkasina dizerdi. Karar: statu quo + gerekce.
+- Gozlem: `wait_until_dep_missing_returns_early` art arda tam-suit kosularinda 2/5 patladi, temiz kutuda 3/3 yesil; suphe = pid-tekrar-kullaniminda test uuid cakismasi (TASK-012).

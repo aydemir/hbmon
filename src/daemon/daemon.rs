@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::OpenOptions;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -26,7 +26,7 @@ use crate::platform::inspector;
 use crate::platform::paths::{self, SockAddr};
 use crate::platform::perm::{secure_fix, SecureMode};
 use crate::platform::signal::{kill_pgroup, Sig};
-use crate::proc::collect_descendants;
+use crate::proc::{collect_descendants, ProcessInspector};
 use crate::util::time::{now_iso, now_secs};
 
 use super::pidfile;
@@ -121,6 +121,354 @@ pub fn spawn_watch(cfg: MonitorConfig, detach: bool) -> Result<MonitorConfig, St
     }
 }
 
+/// Mutable per-tick state (TASK-011: extracted from `run_daemon`).
+struct Poll {
+    stall: StallDetector,
+    watchdog: TimeoutWatchdog,
+    tracker: CpuTracker,
+    prev_io: u64,
+    prev_count: usize,
+    last_poll: Instant,
+    last_metric_ev: Instant,
+    last_oom_poll: Instant,
+    dep_found: Option<DepMatch>,
+    dep_offset: u64,
+    oom_base: u64,
+}
+
+impl Poll {
+    fn new(
+        timeout_sec: Option<u64>,
+        out: &Path,
+        cg: &Option<crate::metrics::cgroup::Cgroup>,
+    ) -> Self {
+        // Stale prefix guard: .out is append-opened, so a reused path could hold
+        // a previous run's bytes. Start scanning where the file ends now.
+        Self {
+            stall: StallDetector::new(),
+            watchdog: TimeoutWatchdog::new(timeout_sec),
+            tracker: CpuTracker::new(),
+            prev_io: 0,
+            prev_count: 0,
+            last_poll: Instant::now(),
+            last_metric_ev: Instant::now() - Duration::from_secs(10),
+            last_oom_poll: Instant::now() - Duration::from_secs(10),
+            dep_found: None,
+            dep_offset: std::fs::metadata(out).map(|m| m.len()).unwrap_or(0),
+            oom_base: cg
+                .as_ref()
+                .and_then(crate::metrics::cgroup::read_stats)
+                .map(|st| st.oom_kills)
+                .unwrap_or(0),
+        }
+    }
+}
+
+/// Borrowed monitor context for one tick: shared state, logger, config,
+/// inspector, child handle and cgroup. Keeps `poll_once` argument list flat.
+struct PollCtx<'a> {
+    shared: &'a Shared,
+    logger: &'a EventLogger,
+    cfg: &'a MonitorConfig,
+    insp: &'a dyn ProcessInspector,
+    child: &'a mut Child,
+    child_pid: u32,
+    cg: &'a Option<crate::metrics::cgroup::Cgroup>,
+    started_secs: f64,
+}
+
+/// One 500ms monitor tick: tree metrics, stall/OOM/dep/timeout, eventlog.
+/// Returns true when the monitor loop must stop. Pure transplant of the old
+/// `run_daemon` loop body — no behavior change.
+fn poll_once(ctx: &mut PollCtx, st: &mut Poll) -> bool {
+    if *ctx.shared.shutdown.lock().unwrap() {
+        ctx.logger.append(&events::new_event(
+            "shutdown",
+            &ctx.cfg.uuid,
+            events::kv(&[("reason", json!("uds shutdown"))]),
+        ));
+        return true;
+    }
+    let dt = st.last_poll.elapsed().as_secs_f32().max(0.05);
+    st.last_poll = Instant::now();
+
+    let alive = ctx.insp.is_alive(ctx.child_pid);
+    let exit_code = ctx
+        .child
+        .try_wait()
+        .ok()
+        .flatten()
+        .map(|s| s.code().unwrap_or(1));
+
+    let pids = collect_descendants(ctx.insp, ctx.child_pid, 1000);
+    let bulk = ctx.insp.bulk_metrics(&pids).unwrap_or_default();
+    // CPU deltas: CpuTracker converts jiffies -> % per pid (Linux).
+    // v0.1 review fix: st.tracker output used to be discarded
+    // (`let _ = pct`) while bulk cpu_pct is always 0.0, so tot_cpu
+    // stayed 0 and the st.stall detector lost its CPU leg.
+    let mut cpu_by_pid: HashMap<u32, f32> = HashMap::new();
+    // CPU deltas: CpuTracker converts raw ticks -> % per pid
+    // (Linux jiffies, Windows FILETIME centis — same 100Hz unit).
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    {
+        for &p in &pids {
+            if let Some(j) = crate::proc::cpu_time(p) {
+                cpu_by_pid.insert(p, st.tracker.update(p, j));
+            }
+        }
+        st.tracker.evict_gone(&pids);
+    }
+    let mut tot_cpu = 0f32;
+    let mut tot_rss = 0u32;
+    let mut tot_r: u64 = 0;
+    let mut tot_w: u64 = 0;
+    let mut tot_fds = 0u32;
+    let mut tot_tcp = 0u32;
+    for (pid, m) in bulk.iter() {
+        tot_cpu += cpu_by_pid.get(pid).copied().unwrap_or(m.cpu_pct);
+        tot_rss = tot_rss.saturating_add(m.rss_mb);
+        tot_r = tot_r.saturating_add(m.io_read_bytes);
+        tot_w = tot_w.saturating_add(m.io_write_bytes);
+        tot_fds = tot_fds.saturating_add(m.fds_open);
+        tot_tcp = tot_tcp.saturating_add(m.net_tcp);
+    }
+    {
+        let mut map = ctx.shared.totals.lock().unwrap();
+        map.insert("cpu_pct".into(), json!(tot_cpu));
+        map.insert("rss_mb".into(), json!(tot_rss));
+        map.insert("io_read_mb".into(), json!((tot_r / (1024 * 1024)) as u32));
+        map.insert("io_write_mb".into(), json!((tot_w / (1024 * 1024)) as u32));
+        map.insert("fds_open".into(), json!(tot_fds));
+        map.insert("net_tcp".into(), json!(tot_tcp));
+        map.insert("net_udp".into(), json!(0));
+        map.insert("io_r".into(), json!(tot_r));
+        map.insert("io_w".into(), json!(tot_w));
+    }
+
+    let io_total = tot_r.saturating_add(tot_w);
+    let io_delta = io_total.saturating_sub(st.prev_io);
+    st.prev_io = io_total;
+    let new_child = pids.len() > st.prev_count;
+    st.prev_count = pids.len();
+    let active = tot_cpu > 0.5 || io_delta > 0 || new_child;
+    if active {
+        let now = now_iso();
+        if tot_cpu > 0.5 {
+            *ctx.shared.last_cpu_at.lock().unwrap() = now.clone();
+        }
+        if io_delta > 0 {
+            *ctx.shared.last_io_at.lock().unwrap() = now;
+        }
+        if new_child {
+            *ctx.shared.last_spawn_at.lock().unwrap() = now_iso();
+        }
+    }
+
+    if st.last_metric_ev.elapsed() >= Duration::from_secs(5) {
+        st.last_metric_ev = Instant::now();
+        let ev = events::new_event(
+            "metric",
+            &ctx.cfg.uuid,
+            events::kv(&[
+                ("cpu", json!(tot_cpu)),
+                ("rss_mb", json!(tot_rss)),
+                ("io_r", json!(tot_r)),
+                ("io_w", json!(tot_w)),
+                ("fds", json!(tot_fds)),
+            ]),
+        );
+        ctx.logger.append(&ev);
+        *ctx.shared.last_event.lock().unwrap() = ev;
+    }
+
+    let (entered, resolved) = st.stall.tick(active, dt);
+    *ctx.shared.stall_score.lock().unwrap() = st.stall.score();
+    *ctx.shared.stall_threshold.lock().unwrap() = st.stall.threshold();
+    if entered {
+        let ev = events::new_event(
+            "stall_suspect",
+            &ctx.cfg.uuid,
+            events::kv(&[
+                ("reason", json!("no_io_no_cpu")),
+                ("idle_sec", json!(st.stall.idle())),
+                ("threshold_sec", json!(st.stall.threshold())),
+                ("p95_idle", json!(st.stall.p95_idle())),
+            ]),
+        );
+        ctx.logger.append(&ev);
+        *ctx.shared.last_event.lock().unwrap() = ev;
+        *ctx.shared.state.lock().unwrap() = State::Stalled;
+    }
+    if resolved {
+        let ev = events::new_event(
+            "stall_resolved",
+            &ctx.cfg.uuid,
+            events::kv(&[("lasted_sec", json!(st.stall.idle()))]),
+        );
+        ctx.logger.append(&ev);
+        *ctx.shared.last_event.lock().unwrap() = ev;
+        *ctx.shared.state.lock().unwrap() = State::Running;
+    }
+
+    if st.dep_found.is_none() {
+        if let Some(dm) = scan_out_for_dep(&ctx.cfg.out, &mut st.dep_offset) {
+            let ev = events::new_event(
+                "dep_missing",
+                &ctx.cfg.uuid,
+                events::kv(&[
+                    ("pattern_id", json!(dm.pattern_id)),
+                    ("category", json!(dm.category)),
+                    ("match_text", json!(dm.match_text)),
+                ]),
+            );
+            ctx.logger.append(&ev);
+            *ctx.shared.last_event.lock().unwrap() = ev.clone();
+            *ctx.shared.dep_info.lock().unwrap() = Some(ev);
+            st.dep_found = Some(dm);
+        }
+    }
+
+    if st.last_oom_poll.elapsed() >= Duration::from_secs(5) {
+        st.last_oom_poll = Instant::now();
+        // cgroup v2 OOM: memory.events oom_kill delta (stronger than dmesg).
+        if let Some(ref c) = ctx.cg {
+            if let Some(stats) = crate::metrics::cgroup::read_stats(c) {
+                ctx.shared.totals.lock().unwrap().insert(
+                    "cgroup".to_string(),
+                    json!({
+                        "cpu_usec": stats.cpu_usec,
+                        "mem_bytes": stats.mem_bytes,
+                        "mem_peak": stats.mem_peak,
+                        "pids": stats.pids,
+                        "oom_kills": stats.oom_kills,
+                    }),
+                );
+                if stats.oom_kills > st.oom_base {
+                    st.oom_base = stats.oom_kills;
+                    let ev = events::new_event(
+                        "oom_suspect",
+                        &ctx.cfg.uuid,
+                        events::kv(&[
+                            ("killed_by", json!("cgroup oom-killer")),
+                            ("oom_kills", json!(stats.oom_kills)),
+                        ]),
+                    );
+                    ctx.logger.append(&ev);
+                    *ctx.shared.last_event.lock().unwrap() = ev.clone();
+                    *ctx.shared.oom_info.lock().unwrap() = Some(ev);
+                    if !alive {
+                        *ctx.shared.state.lock().unwrap() = State::OomKilled;
+                    }
+                }
+            }
+        }
+        let set: HashSet<u32> = pids.iter().copied().collect();
+        let hits = oom::check(&set);
+        if let Some(h) = hits.first() {
+            let ev = events::new_event(
+                "oom_suspect",
+                &ctx.cfg.uuid,
+                events::kv(&[
+                    ("pid", json!(h.pid)),
+                    ("killed_by", json!("oom-killer")),
+                    ("text", json!(h.text.chars().take(300).collect::<String>())),
+                ]),
+            );
+            ctx.logger.append(&ev);
+            *ctx.shared.last_event.lock().unwrap() = ev.clone();
+            *ctx.shared.oom_info.lock().unwrap() = Some(ev);
+            *ctx.shared.state.lock().unwrap() = State::OomKilled;
+        }
+    }
+
+    if st.watchdog.expired() {
+        kill_pgroup(ctx.child_pid, Sig::Term);
+        std::thread::sleep(Duration::from_secs(5));
+        if ctx.insp.is_alive(ctx.child_pid) {
+            kill_pgroup(ctx.child_pid, Sig::Kill);
+        }
+        let _ = ctx.child.wait();
+        *ctx.shared.state.lock().unwrap() = State::Timeout;
+        *ctx.shared.build_code.lock().unwrap() = Some(124);
+        *ctx.shared.exit_secs.lock().unwrap() = Some(now_secs());
+        let ev = events::new_event(
+            "timeout",
+            &ctx.cfg.uuid,
+            events::kv(&[
+                ("elapsed_sec", json!(now_secs() - ctx.started_secs)),
+                ("limit_sec", json!(st.watchdog.limit())),
+            ]),
+        );
+        ctx.logger.append(&ev);
+        let exit_ev = events::new_event(
+            "exit",
+            &ctx.cfg.uuid,
+            events::kv(&[
+                ("pid", json!(ctx.child_pid)),
+                ("code", json!(124)),
+                ("duration_sec", json!(now_secs() - ctx.started_secs)),
+                ("state", json!("timeout")),
+            ]),
+        );
+        ctx.logger.append(&exit_ev);
+        *ctx.shared.last_event.lock().unwrap() = exit_ev;
+        return true;
+    }
+
+    if let Some(code) = exit_code {
+        let _ = ctx.child.wait();
+        let duration = now_secs() - ctx.started_secs;
+        let oom_hit = ctx.shared.oom_info.lock().unwrap().is_some();
+        let (state, mapped) = if st.dep_found.is_some() {
+            (State::DepMissing, 2)
+        } else if oom_hit {
+            (State::OomKilled, 137)
+        } else if code == 0 {
+            (State::Done, 0)
+        } else {
+            (State::Failed, 1)
+        };
+        *ctx.shared.state.lock().unwrap() = state;
+        *ctx.shared.build_code.lock().unwrap() = Some(mapped);
+        *ctx.shared.exit_secs.lock().unwrap() = Some(now_secs());
+        let ev = events::new_event(
+            "exit",
+            &ctx.cfg.uuid,
+            events::kv(&[
+                ("pid", json!(ctx.child_pid)),
+                ("code", json!(mapped)),
+                ("raw_code", json!(code)),
+                ("duration_sec", json!(duration)),
+                ("state", json!(state.as_str())),
+            ]),
+        );
+        ctx.logger.append(&ev);
+        *ctx.shared.last_event.lock().unwrap() = ev;
+        return true;
+    }
+
+    if !alive {
+        *ctx.shared.state.lock().unwrap() = State::Failed;
+        *ctx.shared.build_code.lock().unwrap() = Some(3);
+        *ctx.shared.exit_secs.lock().unwrap() = Some(now_secs());
+        let ev = events::new_event(
+            "exit",
+            &ctx.cfg.uuid,
+            events::kv(&[
+                ("pid", json!(ctx.child_pid)),
+                ("code", json!(3)),
+                ("duration_sec", json!(now_secs() - ctx.started_secs)),
+                ("state", json!("failed")),
+            ]),
+        );
+        ctx.logger.append(&ev);
+        *ctx.shared.last_event.lock().unwrap() = ev;
+        return true;
+    }
+    std::thread::sleep(Duration::from_millis(500));
+    false
+}
+
 pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     let logger = EventLogger::create(&cfg.log)?;
     let insp = inspector();
@@ -157,11 +505,6 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     // cgroup v2 handle (once; path is stable for process lifetime).
     // None on v1/Android/macOS — /proc accounting covers those.
     let cg = crate::metrics::cgroup::locate(child_pid);
-    let mut oom_base: u64 = cg
-        .as_ref()
-        .and_then(crate::metrics::cgroup::read_stats)
-        .map(|s| s.oom_kills)
-        .unwrap_or(0);
 
     pidfile::write_pidfile(&cfg.pidfile, std::process::id())?;
 
@@ -210,307 +553,24 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         });
     }
 
-    let mut stall = StallDetector::new();
-    let watchdog = TimeoutWatchdog::new(cfg.timeout_sec);
-    let mut tracker = CpuTracker::new();
-    let mut prev_io: u64 = 0;
-    let mut prev_count: usize = 0;
-    let mut last_poll = Instant::now();
-    let mut last_metric_ev = Instant::now() - Duration::from_secs(10);
-    let mut last_oom_poll = Instant::now() - Duration::from_secs(10);
-    let mut dep_found: Option<DepMatch> = None;
-    // Stale prefix guard: .out is append-opened, so a reused path could hold
-    // a previous run's bytes. Start scanning where the file ends now.
-    let mut dep_offset: u64 = std::fs::metadata(&cfg.out).map(|m| m.len()).unwrap_or(0);
+    let mut st = Poll::new(cfg.timeout_sec, &cfg.out, &cg);
 
     std::thread::sleep(Duration::from_millis(200));
 
+    let mut ctx = PollCtx {
+        shared: &shared,
+        logger: &logger,
+        cfg: &cfg,
+        insp: &*insp,
+        child: &mut child,
+        child_pid,
+        cg: &cg,
+        started_secs,
+    };
     loop {
-        if *shared.shutdown.lock().unwrap() {
-            logger.append(&events::new_event(
-                "shutdown",
-                &cfg.uuid,
-                events::kv(&[("reason", json!("uds shutdown"))]),
-            ));
+        if poll_once(&mut ctx, &mut st) {
             break;
         }
-        let dt = last_poll.elapsed().as_secs_f32().max(0.05);
-        last_poll = Instant::now();
-
-        let alive = insp.is_alive(child_pid);
-        let exit_code = child
-            .try_wait()
-            .ok()
-            .flatten()
-            .map(|s| s.code().unwrap_or(1));
-
-        let pids = collect_descendants(&*insp, child_pid, 1000);
-        let bulk = insp.bulk_metrics(&pids).unwrap_or_default();
-        // CPU deltas: CpuTracker converts jiffies -> % per pid (Linux).
-        // v0.1 review fix: tracker output used to be discarded
-        // (`let _ = pct`) while bulk cpu_pct is always 0.0, so tot_cpu
-        // stayed 0 and the stall detector lost its CPU leg.
-        let mut cpu_by_pid: HashMap<u32, f32> = HashMap::new();
-        // CPU deltas: CpuTracker converts raw ticks -> % per pid
-        // (Linux jiffies, Windows FILETIME centis — same 100Hz unit).
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
-        {
-            for &p in &pids {
-                if let Some(j) = crate::proc::cpu_time(p) {
-                    cpu_by_pid.insert(p, tracker.update(p, j));
-                }
-            }
-            tracker.evict_gone(&pids);
-        }
-        let mut tot_cpu = 0f32;
-        let mut tot_rss = 0u32;
-        let mut tot_r: u64 = 0;
-        let mut tot_w: u64 = 0;
-        let mut tot_fds = 0u32;
-        let mut tot_tcp = 0u32;
-        for (pid, m) in bulk.iter() {
-            tot_cpu += cpu_by_pid.get(pid).copied().unwrap_or(m.cpu_pct);
-            tot_rss = tot_rss.saturating_add(m.rss_mb);
-            tot_r = tot_r.saturating_add(m.io_read_bytes);
-            tot_w = tot_w.saturating_add(m.io_write_bytes);
-            tot_fds = tot_fds.saturating_add(m.fds_open);
-            tot_tcp = tot_tcp.saturating_add(m.net_tcp);
-        }
-        {
-            let mut map = shared.totals.lock().unwrap();
-            map.insert("cpu_pct".into(), json!(tot_cpu));
-            map.insert("rss_mb".into(), json!(tot_rss));
-            map.insert("io_read_mb".into(), json!((tot_r / (1024 * 1024)) as u32));
-            map.insert("io_write_mb".into(), json!((tot_w / (1024 * 1024)) as u32));
-            map.insert("fds_open".into(), json!(tot_fds));
-            map.insert("net_tcp".into(), json!(tot_tcp));
-            map.insert("net_udp".into(), json!(0));
-            map.insert("io_r".into(), json!(tot_r));
-            map.insert("io_w".into(), json!(tot_w));
-        }
-
-        let io_total = tot_r.saturating_add(tot_w);
-        let io_delta = io_total.saturating_sub(prev_io);
-        prev_io = io_total;
-        let new_child = pids.len() > prev_count;
-        prev_count = pids.len();
-        let active = tot_cpu > 0.5 || io_delta > 0 || new_child;
-        if active {
-            let now = now_iso();
-            if tot_cpu > 0.5 {
-                *shared.last_cpu_at.lock().unwrap() = now.clone();
-            }
-            if io_delta > 0 {
-                *shared.last_io_at.lock().unwrap() = now;
-            }
-            if new_child {
-                *shared.last_spawn_at.lock().unwrap() = now_iso();
-            }
-        }
-
-        if last_metric_ev.elapsed() >= Duration::from_secs(5) {
-            last_metric_ev = Instant::now();
-            let ev = events::new_event(
-                "metric",
-                &cfg.uuid,
-                events::kv(&[
-                    ("cpu", json!(tot_cpu)),
-                    ("rss_mb", json!(tot_rss)),
-                    ("io_r", json!(tot_r)),
-                    ("io_w", json!(tot_w)),
-                    ("fds", json!(tot_fds)),
-                ]),
-            );
-            logger.append(&ev);
-            *shared.last_event.lock().unwrap() = ev;
-        }
-
-        let (entered, resolved) = stall.tick(active, dt);
-        *shared.stall_score.lock().unwrap() = stall.score();
-        *shared.stall_threshold.lock().unwrap() = stall.threshold();
-        if entered {
-            let ev = events::new_event(
-                "stall_suspect",
-                &cfg.uuid,
-                events::kv(&[
-                    ("reason", json!("no_io_no_cpu")),
-                    ("idle_sec", json!(stall.idle())),
-                    ("threshold_sec", json!(stall.threshold())),
-                    ("p95_idle", json!(stall.p95_idle())),
-                ]),
-            );
-            logger.append(&ev);
-            *shared.last_event.lock().unwrap() = ev;
-            *shared.state.lock().unwrap() = State::Stalled;
-        }
-        if resolved {
-            let ev = events::new_event(
-                "stall_resolved",
-                &cfg.uuid,
-                events::kv(&[("lasted_sec", json!(stall.idle()))]),
-            );
-            logger.append(&ev);
-            *shared.last_event.lock().unwrap() = ev;
-            *shared.state.lock().unwrap() = State::Running;
-        }
-
-        if dep_found.is_none() {
-            if let Some(dm) = scan_out_for_dep(&cfg.out, &mut dep_offset) {
-                let ev = events::new_event(
-                    "dep_missing",
-                    &cfg.uuid,
-                    events::kv(&[
-                        ("pattern_id", json!(dm.pattern_id)),
-                        ("category", json!(dm.category)),
-                        ("match_text", json!(dm.match_text)),
-                    ]),
-                );
-                logger.append(&ev);
-                *shared.last_event.lock().unwrap() = ev.clone();
-                *shared.dep_info.lock().unwrap() = Some(ev);
-                dep_found = Some(dm);
-            }
-        }
-
-        if last_oom_poll.elapsed() >= Duration::from_secs(5) {
-            last_oom_poll = Instant::now();
-            // cgroup v2 OOM: memory.events oom_kill delta (stronger than dmesg).
-            if let Some(ref c) = cg {
-                if let Some(st) = crate::metrics::cgroup::read_stats(c) {
-                    shared.totals.lock().unwrap().insert(
-                        "cgroup".to_string(),
-                        json!({
-                            "cpu_usec": st.cpu_usec,
-                            "mem_bytes": st.mem_bytes,
-                            "mem_peak": st.mem_peak,
-                            "pids": st.pids,
-                            "oom_kills": st.oom_kills,
-                        }),
-                    );
-                    if st.oom_kills > oom_base {
-                        oom_base = st.oom_kills;
-                        let ev = events::new_event(
-                            "oom_suspect",
-                            &cfg.uuid,
-                            events::kv(&[
-                                ("killed_by", json!("cgroup oom-killer")),
-                                ("oom_kills", json!(st.oom_kills)),
-                            ]),
-                        );
-                        logger.append(&ev);
-                        *shared.last_event.lock().unwrap() = ev.clone();
-                        *shared.oom_info.lock().unwrap() = Some(ev);
-                        if !alive {
-                            *shared.state.lock().unwrap() = State::OomKilled;
-                        }
-                    }
-                }
-            }
-            let set: HashSet<u32> = pids.iter().copied().collect();
-            let hits = oom::check(&set);
-            if let Some(h) = hits.first() {
-                let ev = events::new_event(
-                    "oom_suspect",
-                    &cfg.uuid,
-                    events::kv(&[
-                        ("pid", json!(h.pid)),
-                        ("killed_by", json!("oom-killer")),
-                        ("text", json!(h.text.chars().take(300).collect::<String>())),
-                    ]),
-                );
-                logger.append(&ev);
-                *shared.last_event.lock().unwrap() = ev.clone();
-                *shared.oom_info.lock().unwrap() = Some(ev);
-                *shared.state.lock().unwrap() = State::OomKilled;
-            }
-        }
-
-        if watchdog.expired() {
-            kill_pgroup(child_pid, Sig::Term);
-            std::thread::sleep(Duration::from_secs(5));
-            if insp.is_alive(child_pid) {
-                kill_pgroup(child_pid, Sig::Kill);
-            }
-            let _ = child.wait();
-            *shared.state.lock().unwrap() = State::Timeout;
-            *shared.build_code.lock().unwrap() = Some(124);
-            *shared.exit_secs.lock().unwrap() = Some(now_secs());
-            let ev = events::new_event(
-                "timeout",
-                &cfg.uuid,
-                events::kv(&[
-                    ("elapsed_sec", json!(now_secs() - started_secs)),
-                    ("limit_sec", json!(watchdog.limit())),
-                ]),
-            );
-            logger.append(&ev);
-            let exit_ev = events::new_event(
-                "exit",
-                &cfg.uuid,
-                events::kv(&[
-                    ("pid", json!(child_pid)),
-                    ("code", json!(124)),
-                    ("duration_sec", json!(now_secs() - started_secs)),
-                    ("state", json!("timeout")),
-                ]),
-            );
-            logger.append(&exit_ev);
-            *shared.last_event.lock().unwrap() = exit_ev;
-            break;
-        }
-
-        if let Some(code) = exit_code {
-            let _ = child.wait();
-            let duration = now_secs() - started_secs;
-            let oom_hit = shared.oom_info.lock().unwrap().is_some();
-            let (state, mapped) = if dep_found.is_some() {
-                (State::DepMissing, 2)
-            } else if oom_hit {
-                (State::OomKilled, 137)
-            } else if code == 0 {
-                (State::Done, 0)
-            } else {
-                (State::Failed, 1)
-            };
-            *shared.state.lock().unwrap() = state;
-            *shared.build_code.lock().unwrap() = Some(mapped);
-            *shared.exit_secs.lock().unwrap() = Some(now_secs());
-            let ev = events::new_event(
-                "exit",
-                &cfg.uuid,
-                events::kv(&[
-                    ("pid", json!(child_pid)),
-                    ("code", json!(mapped)),
-                    ("raw_code", json!(code)),
-                    ("duration_sec", json!(duration)),
-                    ("state", json!(state.as_str())),
-                ]),
-            );
-            logger.append(&ev);
-            *shared.last_event.lock().unwrap() = ev;
-            break;
-        }
-
-        if !alive {
-            *shared.state.lock().unwrap() = State::Failed;
-            *shared.build_code.lock().unwrap() = Some(3);
-            *shared.exit_secs.lock().unwrap() = Some(now_secs());
-            let ev = events::new_event(
-                "exit",
-                &cfg.uuid,
-                events::kv(&[
-                    ("pid", json!(child_pid)),
-                    ("code", json!(3)),
-                    ("duration_sec", json!(now_secs() - started_secs)),
-                    ("state", json!("failed")),
-                ]),
-            );
-            logger.append(&ev);
-            *shared.last_event.lock().unwrap() = ev;
-            break;
-        }
-
-        std::thread::sleep(Duration::from_millis(500));
     }
 
     let linger_until = Instant::now() + Duration::from_secs(60);
@@ -525,7 +585,7 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     Ok(())
 }
 
-/// Incremental dep-scan (TASK-006): reads only bytes appended since the last
+/// Incremental dep-scan (TASK-009): reads only bytes appended since the last
 /// tick instead of the whole `.out` file. A trailing partial line (build
 /// still writing, no `\n` yet) is held back — the offset stays before it so
 /// it is re-scanned next tick once terminated. Truncate/rotate (`len <
