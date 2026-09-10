@@ -121,6 +121,5 @@ pub fn daemon_posture() {
         libc::signal(libc::SIGPIPE, libc::SIG_IGN);
     }
     #[cfg(windows)]
-    {
-    }
+    {}
 }

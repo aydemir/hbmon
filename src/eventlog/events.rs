@@ -17,5 +17,8 @@ pub fn new_event(ev: &str, uuid: &str, extra: HashMap<String, Value>) -> Value {
 }
 
 pub fn kv(pairs: &[(&str, Value)]) -> HashMap<String, Value> {
-    pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.clone()))
+        .collect()
 }

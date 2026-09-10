@@ -60,7 +60,8 @@ pub fn run(a: ExecArgs) -> Result<i32, String> {
     if let Some(err) = child.stderr.take() {
         let reader = BufReader::new(err);
         let stderr = std::io::stderr();
-        for line in reader.lines().flatten() {
+        for line in reader.lines() {
+            let Ok(line) = line else { continue };
             eprintln!("{}", line);
             if dep_hit.is_none() {
                 if let Some(m) = dep_missing::match_line(&line) {

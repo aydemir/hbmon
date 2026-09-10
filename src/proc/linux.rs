@@ -14,6 +14,12 @@ impl LinuxInspector {
     }
 }
 
+impl Default for LinuxInspector {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn read_file(path: &str) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|e| format!("read {}: {}", path, e))
 }
@@ -22,7 +28,9 @@ fn read_file(path: &str) -> Result<String, String> {
 /// so split on last ')'.
 fn parse_stat(pid: u32) -> Result<(u32, u64, u64, i64), String> {
     let s = read_file(&format!("/proc/{}/stat", pid))?;
-    let end = s.rfind(')').ok_or_else(|| format!("bad stat for {}", pid))?;
+    let end = s
+        .rfind(')')
+        .ok_or_else(|| format!("bad stat for {}", pid))?;
     let after = &s[end + 1..];
     let f: Vec<&str> = after.split_whitespace().collect();
     // after comm: [state, ppid, ...] -> f[1] = ppid, f[11]=utime, f[12]=stime, f[21]=rss pages
@@ -81,7 +89,7 @@ impl ProcessInspector for LinuxInspector {
 
     fn metrics(&self, pid: u32) -> Result<Metrics, String> {
         let (_, utime, stime, rss_pages) = parse_stat(pid).unwrap_or((0, 0, 0, 0));
-        let rss_mb = ((rss_pages.max(0) as i64 * page_size()) / (1024 * 1024)) as u32;
+        let rss_mb = ((rss_pages.max(0) * page_size()) / (1024 * 1024)) as u32;
 
         let (io_r, io_w) = read_file(&format!("/proc/{}/io", pid))
             .map(|s| parse_io(&s))

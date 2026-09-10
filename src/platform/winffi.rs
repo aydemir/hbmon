@@ -100,8 +100,12 @@ extern "system" {
         kernel: *mut FileTime,
         user: *mut FileTime,
     ) -> BOOL;
-    pub fn QueryFullProcessImageNameW(h: HANDLE, flags: DWORD, buf: *mut u16, size: *mut DWORD)
-        -> BOOL;
+    pub fn QueryFullProcessImageNameW(
+        h: HANDLE,
+        flags: DWORD,
+        buf: *mut u16,
+        size: *mut DWORD,
+    ) -> BOOL;
     pub fn GetProcessHandleCount(h: HANDLE, n: *mut DWORD) -> BOOL;
     pub fn GetProcessIoCounters(h: HANDLE, io: *mut IoCounters) -> BOOL;
     pub fn TerminateProcess(h: HANDLE, code: DWORD) -> BOOL;

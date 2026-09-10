@@ -23,8 +23,8 @@ where
     if sock_path.exists() {
         std::fs::remove_file(sock_path).ok();
     }
-    let listener =
-        UnixListener::bind(sock_path).map_err(|e| format!("bind {}: {}", sock_display(sock_path), e))?;
+    let listener = UnixListener::bind(sock_path)
+        .map_err(|e| format!("bind {}: {}", sock_display(sock_path), e))?;
     secure_fix(sock_path);
     for conn in listener.incoming() {
         match conn {
@@ -44,7 +44,10 @@ fn handle_one(stream: UnixStream, handler: &dyn Fn(Value) -> Value) {
     let req = match read_message(&mut reader) {
         Ok(v) => v,
         Err(e) => {
-            let _ = write_message(&mut writer, &error_response("unknown", "INVALID_REQUEST", &e));
+            let _ = write_message(
+                &mut writer,
+                &error_response("unknown", "INVALID_REQUEST", &e),
+            );
             return;
         }
     };

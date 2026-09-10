@@ -39,7 +39,10 @@ pub fn check(watched: &HashSet<u32>) -> Vec<OomEvent> {
     let mut hits = vec![];
     for line in text.lines().rev().take(200) {
         let low = line.to_lowercase();
-        if low.contains("out of memory") || low.contains("oom-kill") || low.contains("killed process") {
+        if low.contains("out of memory")
+            || low.contains("oom-kill")
+            || low.contains("killed process")
+        {
             if let Some(pid) = extract_pid(line) {
                 if watched.contains(&pid) {
                     hits.push(OomEvent {
@@ -62,7 +65,10 @@ fn extract_pid(line: &str) -> Option<u32> {
     for (i, w) in line.split_whitespace().enumerate() {
         if w == "process" {
             if let Some(next) = line.split_whitespace().nth(i + 1) {
-                if let Ok(p) = next.trim_matches(|c: char| !c.is_ascii_digit()).parse::<u32>() {
+                if let Ok(p) = next
+                    .trim_matches(|c: char| !c.is_ascii_digit())
+                    .parse::<u32>()
+                {
                     if p > 0 {
                         return Some(p);
                     }

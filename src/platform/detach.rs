@@ -47,7 +47,7 @@ fn unix_detach() -> Result<(), String> {
         libc::close(0);
         libc::close(1);
         libc::close(2);
-        let fd = libc::open(b"/dev/null\0".as_ptr() as *const libc::c_char, libc::O_RDWR);
+        let fd = libc::open(c"/dev/null".as_ptr(), libc::O_RDWR);
         if fd >= 0 {
             libc::dup2(fd, 0);
             libc::dup2(fd, 1);
@@ -59,9 +59,7 @@ fn unix_detach() -> Result<(), String> {
     }
     crate::platform::signal::daemon_posture();
     let _ = std::env::set_current_dir("/");
-    unsafe {
-        libc::umask(0o077)
-    };
+    unsafe { libc::umask(0o077) };
     Ok(())
 }
 
@@ -191,10 +189,9 @@ fn windows_detach(uuid: &str) -> Result<(), String> {
         }
     }
     if ok == 0 {
-        return Err(format!(
-            "detach spawn: {}",
-            unsafe { winffi::GetLastError() }
-        ));
+        return Err(format!("detach spawn: {}", unsafe {
+            winffi::GetLastError()
+        }));
     }
     std::process::exit(0);
 }
@@ -205,7 +202,9 @@ fn quote_arg(s: &str) -> String {
     if s.is_empty() {
         return "\"\"".to_string();
     }
-    let needs = s.chars().any(|c| c == ' ' || c == '\t' || c == '"' || c == '\n');
+    let needs = s
+        .chars()
+        .any(|c| c == ' ' || c == '\t' || c == '"' || c == '\n');
     if !needs {
         return s.to_string();
     }
@@ -265,7 +264,10 @@ fn filtered_argv() -> Vec<String> {
 #[cfg(windows)]
 fn ensure_uuid(args: &mut Vec<String>, uuid: &str) {
     let end = args.iter().position(|a| a == "--").unwrap_or(args.len());
-    if args[..end].iter().any(|a| a == "--uuid" || a.starts_with("--uuid=")) {
+    if args[..end]
+        .iter()
+        .any(|a| a == "--uuid" || a.starts_with("--uuid="))
+    {
         return;
     }
     // argv[0] = "watch" (binary skip'li); hemen ardına ekle.
@@ -280,8 +282,8 @@ fn ensure_uuid(args: &mut Vec<String>, uuid: &str) {
 
 #[cfg(windows)]
 fn windows_child_spawned(child: &std::process::Child) {
-    use std::os::windows::io::AsRawHandle;
     use super::winffi;
+    use std::os::windows::io::AsRawHandle;
     let proc = child.as_raw_handle() as winffi::HANDLE;
     let job = unsafe { winffi::CreateJobObjectW(std::ptr::null_mut(), std::ptr::null()) };
     if !winffi::valid(job) {
@@ -294,7 +296,8 @@ fn windows_child_spawned(child: &std::process::Child) {
             winffi::JOB_OBJECT_BASIC_LIMIT_INFO,
             &limits as *const _ as *const std::ffi::c_void,
             std::mem::size_of::<winffi::JobBasicLimits>() as u32,
-        ) != 0 && winffi::AssignProcessToJobObject(job, proc) != 0
+        ) != 0
+            && winffi::AssignProcessToJobObject(job, proc) != 0
     };
     if ok {
         super::signal::register_job(child.id(), job);

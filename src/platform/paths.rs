@@ -232,7 +232,11 @@ fn scan_newest_pipe() -> Option<SockAddr> {
     }
     let mut best: Option<((u32, u32), String)> = None;
     loop {
-        let end = data.name.iter().position(|&c| c == 0).unwrap_or(data.name.len());
+        let end = data
+            .name
+            .iter()
+            .position(|&c| c == 0)
+            .unwrap_or(data.name.len());
         let name = String::from_utf16_lossy(&data.name[..end]);
         if name.starts_with("hbmon-") {
             let key = (data.write_hi, data.write_lo);

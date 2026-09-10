@@ -7,8 +7,8 @@
 //!   deliberately ignored — units undocumented, garbage CPU% would be
 //!   worse than honest 0.0 for the stall detector)
 //! - `proc_listpids(PROC_PIDLISTFDS, pid, NULL, 0)` (fd count trick)
-//! Every query falls back gracefully so a wrong struct size on a future
-//! macOS can never crash the daemon — it just reports zeros again.
+//!   Every query falls back gracefully so a wrong struct size on a future
+//!   macOS can never crash the daemon — it just reports zeros again.
 
 #[cfg(target_os = "macos")]
 mod inner {
@@ -19,6 +19,11 @@ mod inner {
     impl MacosInspector {
         pub fn new() -> Self {
             Self
+        }
+    }
+    impl Default for MacosInspector {
+        fn default() -> Self {
+            Self::new()
         }
     }
 
@@ -145,12 +150,7 @@ mod inner {
                     m.rss_mb = (info.resident_size / (1024 * 1024)) as u32;
                 }
                 // fd count without any buffer: returns count directly.
-                let nfds = proc_listpids(
-                    PROC_PIDLISTFDS,
-                    pid,
-                    std::ptr::null_mut(),
-                    0,
-                );
+                let nfds = proc_listpids(PROC_PIDLISTFDS, pid, std::ptr::null_mut(), 0);
                 if nfds > 0 {
                     m.fds_open = nfds as u32;
                 }
@@ -188,6 +188,11 @@ mod stub {
     impl MacosInspector {
         pub fn new() -> Self {
             Self
+        }
+    }
+    impl Default for MacosInspector {
+        fn default() -> Self {
+            Self::new()
         }
     }
     impl ProcessInspector for MacosInspector {

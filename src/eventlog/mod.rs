@@ -61,7 +61,7 @@ impl EventLogger {
         }
         if let Ok(file) = File::open(&self.path) {
             let reader = BufReader::new(file);
-            let lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+            let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
             let drop_n = lines.len() / 10 + 1;
             if let Ok(mut f) = self.file.lock() {
                 // truncate + rewrite tail
@@ -87,7 +87,7 @@ impl EventLogger {
             Err(_) => return vec![],
         };
         let reader = BufReader::new(file);
-        let lines: Vec<String> = reader.lines().filter_map(|l| l.ok()).collect();
+        let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
         if lines.len() <= n {
             lines
         } else {

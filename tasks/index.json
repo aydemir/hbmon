@@ -139,5 +139,39 @@
     "created": "2026-09-09",
     "updated": "2026-09-09",
     "file": "tasks/done/TASK-009-incremental-dep-scan.md"
+  },
+  {
+    "id": "TASK-010",
+    "title": "DepMatch birlestirme",
+    "status": "todo",
+    "priority": "P3",
+    "environment": "both",
+    "labels": [
+      "daemon",
+      "health",
+      "cleanup"
+    ],
+    "depends_on": [],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/todo/TASK-010-dep-match-merge.md"
+  },
+  {
+    "id": "TASK-011",
+    "title": "run_daemon bolme",
+    "status": "todo",
+    "priority": "P3",
+    "environment": "both",
+    "labels": [
+      "daemon",
+      "refactor",
+      "readability"
+    ],
+    "depends_on": [
+      "TASK-010"
+    ],
+    "created": "2026-09-09",
+    "updated": "2026-09-09",
+    "file": "tasks/todo/TASK-011-run-daemon-split.md"
   }
 ]

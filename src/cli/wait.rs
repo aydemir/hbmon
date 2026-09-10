@@ -41,15 +41,17 @@ pub fn run(a: WaitArgs) -> Result<i32, String> {
     // decides when to return.
     let resp = send_request(&sock, &req, (a.timeout as u64) + 15)?;
     println!("{}", serde_json::to_string(&resp).unwrap());
-    if resp.get("timeout").and_then(|v| v.as_bool()).unwrap_or(false) {
+    if resp
+        .get("timeout")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false)
+    {
         return Ok(124);
     }
     // Erken dönüşte (ara sinyal) code alanı yoksa exit 0; ajan woke_on'a bakar.
-    Ok(resp.get("code").and_then(|v| v.as_i64()).map(|c| c as i32).unwrap_or_else(|| {
-        if resp.get("woke_on").is_some() {
-            0
-        } else {
-            1
-        }
-    }))
+    Ok(resp
+        .get("code")
+        .and_then(|v| v.as_i64())
+        .map(|c| c as i32)
+        .unwrap_or_else(|| if resp.get("woke_on").is_some() { 0 } else { 1 }))
 }

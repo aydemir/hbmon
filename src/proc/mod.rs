@@ -50,7 +50,6 @@ pub trait ProcessInspector: Send + Sync {
 }
 
 /// Collect full descendant set (BFS) with cycle guard.
-
 /// Raw CPU time in `CpuTracker` units (ticks at 100Hz).
 /// Linux: /proc jiffies; Windows: FILETIME centiseconds; else: None
 /// (caller falls back to instantaneous `cpu_pct`, e.g. macOS 0.0).
@@ -68,11 +67,8 @@ pub fn cpu_time(pid: u32) -> Option<u64> {
         let _ = pid;
         None
     }
-}pub fn collect_descendants(
-    insp: &dyn ProcessInspector,
-    root: u32,
-    max: usize,
-) -> Vec<u32> {
+}
+pub fn collect_descendants(insp: &dyn ProcessInspector, root: u32, max: usize) -> Vec<u32> {
     let mut out = vec![root];
     let mut queue = vec![root];
     let mut seen = std::collections::HashSet::new();

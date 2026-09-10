@@ -170,8 +170,7 @@ fn watch_status_wait_full_cycle() {
         .output()
         .unwrap();
     assert!(out.status.success());
-    let hs: Value =
-        serde_json::from_slice(&out.stdout).expect("watch prints handshake");
+    let hs: Value = serde_json::from_slice(&out.stdout).expect("watch prints handshake");
     assert_eq!(hs["uuid"], id.as_str());
 
     wait_for_ready(&s);
@@ -231,7 +230,12 @@ fn kill_terminates_build() {
 fn exec_json_summary_on_stderr() {
     let out = hbmon()
         .args({
-            let mut a = vec!["exec".to_string(), "--format".to_string(), "json".to_string(), "--".to_string()];
+            let mut a = vec![
+                "exec".to_string(),
+                "--format".to_string(),
+                "json".to_string(),
+                "--".to_string(),
+            ];
             a.extend(shell_cmd("exit 3"));
             a
         })
@@ -329,7 +333,8 @@ fn watch_without_uuid_handshake_matches_daemon() {
 }
 
 #[test]
-fn wait_until_stall_suspect_returns_early() {    let id = uuid("until-stall");
+fn wait_until_stall_suspect_returns_early() {
+    let id = uuid("until-stall");
     let s = sock_for(&id);
     let out = hbmon()
         .args(watch_args(&id, sleep_cmd(45)))

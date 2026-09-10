@@ -24,7 +24,9 @@ pub fn write_pidfile(path: &Path, pid: u32) -> Result<(), String> {
 
 pub fn read_pidfile(path: &Path) -> Result<u32, String> {
     let s = std::fs::read_to_string(path).map_err(|e| format!("read pidfile: {}", e))?;
-    s.trim().parse::<u32>().map_err(|e| format!("bad pidfile: {}", e))
+    s.trim()
+        .parse::<u32>()
+        .map_err(|e| format!("bad pidfile: {}", e))
 }
 
 pub fn remove(path: &Path) {

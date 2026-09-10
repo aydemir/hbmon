@@ -19,7 +19,9 @@ fn build_into(
     if !seen.insert(pid) {
         return Err("cycle".to_string());
     }
-    let cmd = insp.cmdline(pid).unwrap_or_else(|_| format!("[pid {}]", pid));
+    let cmd = insp
+        .cmdline(pid)
+        .unwrap_or_else(|_| format!("[pid {}]", pid));
     let (cpu, rss) = insp
         .metrics(pid)
         .map(|m| (m.cpu_pct, m.rss_mb))
@@ -43,7 +45,11 @@ fn build_into(
         cmd,
         cpu,
         rss_mb: rss,
-        state: if alive { "running".to_string() } else { "exited".to_string() },
+        state: if alive {
+            "running".to_string()
+        } else {
+            "exited".to_string()
+        },
         children,
     })
 }

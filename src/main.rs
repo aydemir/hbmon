@@ -1,5 +1,5 @@
 use clap::Parser;
-use hbmon::cli::{Cli, dispatch};
+use hbmon::cli::{dispatch, Cli};
 
 fn main() {
     let cli = Cli::parse();

@@ -52,7 +52,9 @@ impl MonitorConfig {
         timeout_sec: Option<u64>,
         label: Option<String>,
     ) -> Self {
-        let sock = sock.map(paths::from_explicit).unwrap_or_else(|| paths::default_sock(&uuid));
+        let sock = sock
+            .map(paths::from_explicit)
+            .unwrap_or_else(|| paths::default_sock(&uuid));
         let log = log.unwrap_or_else(|| paths::default_log(&uuid));
         let pidfile = paths::default_pidfile(&uuid);
         let out = paths::default_out(&uuid);
@@ -145,7 +147,9 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     cmd.stdout(Stdio::from(out_file));
     cmd.stderr(Stdio::from(err_file));
     crate::platform::detach::child_group(&mut cmd);
-    let mut child = cmd.spawn().map_err(|e| format!("spawn {}: {}", cfg.cmd[0], e))?;
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("spawn {}: {}", cfg.cmd[0], e))?;
     let child_pid = child.id();
     crate::platform::detach::child_spawned(&child);
     let root_cmd = cfg.cmd.join(" ");
@@ -576,10 +580,22 @@ fn dispatch(req: Value, shared: &Shared, logger_path: &Path) -> Value {
                 "cpu".to_string(),
                 t.get("cpu_pct").cloned().unwrap_or(json!(0.0)),
             );
-            m.insert("rss_mb".to_string(), t.get("rss_mb").cloned().unwrap_or(json!(0)));
-            m.insert("io_r".to_string(), t.get("io_r").cloned().unwrap_or(json!(0)));
-            m.insert("io_w".to_string(), t.get("io_w").cloned().unwrap_or(json!(0)));
-            m.insert("fds".to_string(), t.get("fds_open").cloned().unwrap_or(json!(0)));
+            m.insert(
+                "rss_mb".to_string(),
+                t.get("rss_mb").cloned().unwrap_or(json!(0)),
+            );
+            m.insert(
+                "io_r".to_string(),
+                t.get("io_r").cloned().unwrap_or(json!(0)),
+            );
+            m.insert(
+                "io_w".to_string(),
+                t.get("io_w").cloned().unwrap_or(json!(0)),
+            );
+            m.insert(
+                "fds".to_string(),
+                t.get("fds_open").cloned().unwrap_or(json!(0)),
+            );
             m.insert(
                 "net_tcp".to_string(),
                 t.get("net_tcp").cloned().unwrap_or(json!(0)),
@@ -761,12 +777,7 @@ fn status_snapshot(shared: &Shared, id: &str, logger_path: &Path) -> Value {
 /// Doluysa listedeki ilk sinyal kazanır; ara sinyaller (stall/dep/oom)
 /// build bitmeden de eşleşebilir — erken dönüşün çekirdeği.
 /// Bilinmeyen adlar yok sayılır.
-fn wait_match(
-    state: State,
-    until: &[String],
-    dep_hit: bool,
-    oom_hit: bool,
-) -> Option<String> {
+fn wait_match(state: State, until: &[String], dep_hit: bool, oom_hit: bool) -> Option<String> {
     if until.is_empty() {
         if matches!(
             state,
@@ -822,12 +833,7 @@ mod tests {
     #[test]
     fn stall_and_oom_wake_early() {
         assert_eq!(
-            wait_match(
-                State::Stalled,
-                &["stall_suspect".to_string()],
-                false,
-                false
-            ),
+            wait_match(State::Stalled, &["stall_suspect".to_string()], false, false),
             Some("stall_suspect".to_string())
         );
         assert_eq!(

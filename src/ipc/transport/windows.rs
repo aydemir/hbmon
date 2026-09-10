@@ -20,9 +20,9 @@ use super::super::codec::{read_message, write_message};
 use super::super::protocol::error_response;
 use crate::platform::paths::{sock_display, SockAddr};
 use crate::platform::winffi::{
-    self, BOOL, DWORD, ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_PIPE_BUSY,
-    ERROR_PIPE_CONNECTED, FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE,
-    HANDLE, OPEN_EXISTING, WAIT_OBJECT_0, WAIT_TIMEOUT,
+    self, BOOL, DWORD, ERROR_BROKEN_PIPE, ERROR_IO_PENDING, ERROR_PIPE_BUSY, ERROR_PIPE_CONNECTED,
+    FILE_SHARE_READ, FILE_SHARE_WRITE, GENERIC_READ, GENERIC_WRITE, HANDLE, OPEN_EXISTING,
+    WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 
 const PIPE_ACCESS_DUPLEX: DWORD = 3;
@@ -65,13 +65,7 @@ extern "system" {
         tmpl: HANDLE,
     ) -> HANDLE;
     fn WaitNamedPipeW(name: *const u16, timeout: DWORD) -> BOOL;
-    fn ReadFile(
-        h: HANDLE,
-        buf: *mut u8,
-        n: DWORD,
-        read: *mut DWORD,
-        ov: *mut Overlapped,
-    ) -> BOOL;
+    fn ReadFile(h: HANDLE, buf: *mut u8, n: DWORD, read: *mut DWORD, ov: *mut Overlapped) -> BOOL;
     fn WriteFile(
         h: HANDLE,
         buf: *const u8,
@@ -115,7 +109,10 @@ impl PipeStream {
     }
 
     /// Overlapped I/O çekirdeği: `op` tetiklenir, event beklenir.
-    fn overlapped_op(&mut self, op: &dyn Fn(*mut Overlapped, *mut DWORD) -> BOOL) -> io::Result<DWORD> {
+    fn overlapped_op(
+        &mut self,
+        op: &dyn Fn(*mut Overlapped, *mut DWORD) -> BOOL,
+    ) -> io::Result<DWORD> {
         let mut ov = Overlapped {
             internal: 0,
             internal_high: 0,
@@ -130,7 +127,10 @@ impl PipeStream {
         }
         let err = unsafe { winffi::GetLastError() };
         if err == ERROR_BROKEN_PIPE {
-            return Err(io::Error::new(io::ErrorKind::BrokenPipe, "pipe closed by peer"));
+            return Err(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "pipe closed by peer",
+            ));
         }
         if err != ERROR_IO_PENDING {
             return Err(io::Error::new(
@@ -230,11 +230,9 @@ where
             )
         };
         if !winffi::valid(h) {
-            return Err(format!(
-                "pipe bind {}: {}",
-                sock_display(addr),
-                unsafe { winffi::GetLastError() }
-            ));
+            return Err(format!("pipe bind {}: {}", sock_display(addr), unsafe {
+                winffi::GetLastError()
+            }));
         }
         let rc = unsafe { ConnectNamedPipe(h, ptr::null_mut()) };
         if rc == 0 && unsafe { winffi::GetLastError() } != ERROR_PIPE_CONNECTED {
@@ -256,12 +254,10 @@ where
                     }
                 });
             }
-            None => {
-                unsafe {
-                    DisconnectNamedPipe(h);
-                    winffi::CloseHandle(h);
-                }
-            }
+            None => unsafe {
+                DisconnectNamedPipe(h);
+                winffi::CloseHandle(h);
+            },
         }
     }
 }
@@ -291,11 +287,9 @@ pub fn send_request(addr: &SockAddr, req: &Value, timeout_secs: u64) -> Result<V
         .saturating_mul(1000)
         .min((INFINITE - 1) as u64) as DWORD;
     if unsafe { WaitNamedPipeW(name.as_ptr(), ms) } == 0 {
-        return Err(format!(
-            "pipe wait {}: {}",
-            sock_display(addr),
-            unsafe { winffi::GetLastError() }
-        ));
+        return Err(format!("pipe wait {}: {}", sock_display(addr), unsafe {
+            winffi::GetLastError()
+        }));
     }
     let h = unsafe {
         CreateFileW(
@@ -309,11 +303,9 @@ pub fn send_request(addr: &SockAddr, req: &Value, timeout_secs: u64) -> Result<V
         )
     };
     if !winffi::valid(h) {
-        return Err(format!(
-            "pipe connect {}: {}",
-            sock_display(addr),
-            unsafe { winffi::GetLastError() }
-        ));
+        return Err(format!("pipe connect {}: {}", sock_display(addr), unsafe {
+            winffi::GetLastError()
+        }));
     }
     let mut s = match PipeStream::new(h, ms) {
         Some(s) => s,

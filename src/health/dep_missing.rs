@@ -24,16 +24,48 @@ macro_rules! pat {
 
 static PATTERNS: Lazy<Vec<Pat>> = Lazy::new(|| {
     vec![
-        pat!("cmd_not_found", "dep_missing:command", r"(?i)command not found"),
-        pat!("no_such_file", "dep_missing:path", r"No such file or directory"),
-        pat!("npm_module", "dep_missing:npm", r#"Cannot find module ['"]?(\S+)['"]?"#),
-        pat!("py_module", "dep_missing:pymod", r#"ModuleNotFoundError: No module named ['"]?(\S+)['"]?"#),
-        pat!("cargo_manifest", "dep_missing:crates", r"error: failed to parse manifest"),
-        pat!("cabal_pkg", "dep_missing:cabal", r"error: package ID specification .* lacked"),
-        pat!("c_header", "dep_missing:header", r"fatal error: .*: No such file"),
+        pat!(
+            "cmd_not_found",
+            "dep_missing:command",
+            r"(?i)command not found"
+        ),
+        pat!(
+            "no_such_file",
+            "dep_missing:path",
+            r"No such file or directory"
+        ),
+        pat!(
+            "npm_module",
+            "dep_missing:npm",
+            r#"Cannot find module ['"]?(\S+)['"]?"#
+        ),
+        pat!(
+            "py_module",
+            "dep_missing:pymod",
+            r#"ModuleNotFoundError: No module named ['"]?(\S+)['"]?"#
+        ),
+        pat!(
+            "cargo_manifest",
+            "dep_missing:crates",
+            r"error: failed to parse manifest"
+        ),
+        pat!(
+            "cabal_pkg",
+            "dep_missing:cabal",
+            r"error: package ID specification .* lacked"
+        ),
+        pat!(
+            "c_header",
+            "dep_missing:header",
+            r"fatal error: .*: No such file"
+        ),
         pat!("ld_lib", "dep_missing:lib", r"Could not find .* in"),
         pat!("pkg_config", "dep_missing:pkg", r"Package .* was not found"),
-        pat!("link_fail", "dep_missing:link", r"error: linking with \S+ failed"),
+        pat!(
+            "link_fail",
+            "dep_missing:link",
+            r"error: linking with \S+ failed"
+        ),
     ]
 });
 
@@ -71,8 +103,7 @@ pub fn load_from(path: &Path) -> Vec<CustomPat> {
         Err(_) => return vec![],
     };
     let defs: Vec<CustomDef> = serde_json::from_str(&data).unwrap_or_default();
-    defs
-        .into_iter()
+    defs.into_iter()
         .filter_map(|d| {
             Regex::new(&d.regex).ok().map(|re| CustomPat {
                 id: d.id,
@@ -83,9 +114,8 @@ pub fn load_from(path: &Path) -> Vec<CustomPat> {
         .collect()
 }
 
-static CUSTOM: Lazy<Vec<CustomPat>> = Lazy::new(|| {
-    custom_path().map(|p| load_from(&p)).unwrap_or_default()
-});
+static CUSTOM: Lazy<Vec<CustomPat>> =
+    Lazy::new(|| custom_path().map(|p| load_from(&p)).unwrap_or_default());
 
 pub struct DepMatch {
     pub pattern_id: String,

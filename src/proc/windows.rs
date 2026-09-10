@@ -32,8 +32,7 @@ mod inner {
     }
 
     const QUERY: u32 = winffi::PROCESS_QUERY_LIMITED_INFORMATION;
-    const QUERY_VM: u32 =
-        winffi::PROCESS_QUERY_LIMITED_INFORMATION | winffi::PROCESS_VM_READ;
+    const QUERY_VM: u32 = winffi::PROCESS_QUERY_LIMITED_INFORMATION | winffi::PROCESS_VM_READ;
 
     fn open(pid: u32, access: u32) -> Option<winffi::HANDLE> {
         let h = unsafe { winffi::OpenProcess(access, 0, pid) };
@@ -44,22 +43,16 @@ mod inner {
         }
     }
 
-        /// Ham CPU zamanı, centisecond (100ns / 100_000).
+    /// Ham CPU zamanı, centisecond (100ns / 100_000).
     /// `CpuTracker` birimiyle birebir (100Hz jiffies eşdeğeri).
-    pub fn cpu_centis(pid: u32) -> Option<u64> {        let h = open(pid, QUERY)?;
+    pub fn cpu_centis(pid: u32) -> Option<u64> {
+        let h = open(pid, QUERY)?;
         let mut creation = winffi::FileTime { low: 0, high: 0 };
         let mut exit = winffi::FileTime { low: 0, high: 0 };
         let mut kernel = winffi::FileTime { low: 0, high: 0 };
         let mut user = winffi::FileTime { low: 0, high: 0 };
-        let ok = unsafe {
-            winffi::GetProcessTimes(
-                h,
-                &mut creation,
-                &mut exit,
-                &mut kernel,
-                &mut user,
-            )
-        };
+        let ok =
+            unsafe { winffi::GetProcessTimes(h, &mut creation, &mut exit, &mut kernel, &mut user) };
         unsafe {
             winffi::CloseHandle(h);
         }
@@ -78,9 +71,7 @@ mod inner {
         pids.reverse();
         let mut root_ok = false;
         for pid in pids {
-            let h = unsafe {
-                winffi::OpenProcess(winffi::PROCESS_TERMINATE, 0, pid)
-            };
+            let h = unsafe { winffi::OpenProcess(winffi::PROCESS_TERMINATE, 0, pid) };
             if !winffi::valid(h) {
                 continue;
             }
@@ -97,8 +88,7 @@ mod inner {
 
     impl ProcessInspector for WindowsInspector {
         fn list_children(&self, pid: u32) -> Result<Vec<u32>, String> {
-            let snap =
-                unsafe { winffi::CreateToolhelp32Snapshot(winffi::TH32CS_SNAPPROCESS, 0) };
+            let snap = unsafe { winffi::CreateToolhelp32Snapshot(winffi::TH32CS_SNAPPROCESS, 0) };
             if !winffi::valid(snap) {
                 return Err("snapshot failed".to_string());
             }

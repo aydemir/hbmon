@@ -92,9 +92,7 @@ fn run_cleanup(a: CleanupArgs) -> Result<i32, String> {
                 .map(|d| d.as_secs() > a.older_than)
                 .unwrap_or(false);
             // sockets: only remove if nobody listens (stale)
-            if name.ends_with(".sock")
-                && crate::ipc::can_connect(&paths::from_explicit(e.path()))
-            {
+            if name.ends_with(".sock") && crate::ipc::can_connect(&paths::from_explicit(e.path())) {
                 continue;
             }
             if age_ok {

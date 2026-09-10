@@ -21,10 +21,7 @@ pub fn now_iso() -> String {
 
 pub fn format_epoch_iso(secs: i64) -> String {
     let (y, mo, d, hh, mm, ss) = civil_from_secs(secs);
-    format!(
-        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-        y, mo, d, hh, mm, ss
-    )
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z", y, mo, d, hh, mm, ss)
 }
 
 /// Unix epoch saniyesi → (yıl, ay, gün, saat, dak, sn).
