@@ -1,7 +1,7 @@
 ---
 id: TASK-012
 title: "test uuid cakisma sertlestirme (pid-tekrar-kullanim flake)"
-status: todo
+status: done
 priority: P3
 created: 2026-09-10
 updated: 2026-09-10
@@ -40,3 +40,7 @@ TASK-011 dogrulamasinda `wait_until_dep_missing_returns_early` kirli kutuda
 ## Doğrulama
 
 - Art arda 3 tam suitte 8/8 yesil
+
+## Gerceklesme Notu (2026-09-10)
+
+- `uuid()` pid+nanos oldu; art arda 3 tam suit 44+8 yesil.

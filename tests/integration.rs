@@ -8,7 +8,13 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 fn uuid(tag: &str) -> String {
-    format!("itest-{}-{}", std::process::id(), tag)
+    // pid + nanos: pid reuse across rapid re-runs must not collide with a
+    // previous run's lingering daemon socket (TASK-012 flake).
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("itest-{}-{}-{}", std::process::id(), nanos, tag)
 }
 
 /// Daemon'un bu uuid için dinlediği adres (metin): unix'te
