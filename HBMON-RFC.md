@@ -187,6 +187,19 @@ hbmon watch --pid $$ --detach -- make -j8
 - LLM exit code 0 alır, kendi işine devam edebilir
 - Build bittiğinde daemon kendini temizler (pid/sock/log unlink + exit)
 
+### 4.2.1 Garanti sınırı (cgroup)
+
+Yukarıdaki pattern iki ayrı bağımlılığı karıştırmaz:
+
+- session / process-group bağımlılığı → double-fork + setsid ile çözülür.
+- cgroup üyeliği ayrı bir mekanizmadır; setsid süreçleri cgroup'tan çıkarmaz.
+
+Dolayısıyla host/harness cgroup politikası (reaping, limit, kill) HBMon'un
+kontrol alanı dışındadır. Garanti şu cümleyle sınırlıdır: HBMon,
+terminal/session/process-group yaşam döngüsünden bağımsız bir supervisor
+olmaya çalışır; cgroup politikaları ayrıca sınırdır. Bu, cgroup sorununun
+çözüldüğü anlamına gelmez — yalnızca kontrol alanının sınırını tarif eder.
+
 ### 4.3 OS Davranış Matrisi
 
 | OS | setsid | Double-fork | Notlar |

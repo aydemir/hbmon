@@ -10,7 +10,9 @@ izleme (Toolhelp+RSS/IO/handle; net best-effort, cmdline = exe yolu).
 
 Üç katmanlı ayrıştırma: **yaşam döngüsü** (setsid + double-fork → init'e reparent),
 **iletişim** (sidecar JSONL + UDS üzerinden çekme-tabanlı sorgu, context'e log sızmaz),
-**keşif** (env var + `/tmp/hbmon-*.sock` convention).
+**keşif** (env var + `/tmp/hbmon-*.sock` convention). Sınır: setsid
+session/process-group'dan çıkarır ama cgroup'tan çıkarmaz; host/harness
+cgroup politikası HBMon'un kontrol alanı dışındadır (detay `HBMON-RFC.md` §4.2.1).
 
 ## Kurulum
 
