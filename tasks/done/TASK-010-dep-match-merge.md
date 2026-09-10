@@ -1,7 +1,7 @@
 ---
 id: TASK-010
 title: "DepMatch birlestirme (daemon/health duplikasyonu)"
-status: todo
+status: done
 priority: P3
 created: 2026-09-09
 updated: 2026-09-09

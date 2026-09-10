@@ -18,6 +18,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::eventlog::{events, EventLogger};
+use crate::health::dep_missing::DepMatch;
 use crate::health::{dep_missing, oom, stall::StallDetector, timeout::TimeoutWatchdog, State};
 use crate::ipc::{error_response, protocol::ok_response};
 use crate::metrics::CpuTracker;
@@ -524,12 +525,6 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     Ok(())
 }
 
-struct DepMatch {
-    pattern_id: String,
-    category: String,
-    match_text: String,
-}
-
 /// Incremental dep-scan (TASK-006): reads only bytes appended since the last
 /// tick instead of the whole `.out` file. A trailing partial line (build
 /// still writing, no `\n` yet) is held back — the offset stays before it so
@@ -554,11 +549,7 @@ fn scan_out_for_dep(out: &Path, offset: &mut u64) -> Option<DepMatch> {
     let text = String::from_utf8_lossy(&buf[..consumed]);
     for line in text.lines().rev() {
         if let Some(m) = dep_missing::match_line(line) {
-            return Some(DepMatch {
-                pattern_id: m.pattern_id,
-                category: m.category,
-                match_text: m.match_text,
-            });
+            return Some(m);
         }
     }
     None
