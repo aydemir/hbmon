@@ -1,7 +1,7 @@
 ---
 id: TASK-002
 title: "Release + crates.io yayını"
-status: in_progress
+status: done
 priority: P1
 created: 2026-09-09
 updated: 2026-09-13
@@ -57,3 +57,8 @@ boyutunu ölçmek (<5MB hedefi doğrulanacak).
 - `cargo publish` BAŞARISIZ: crates.io 400 — "A verified email address is required"
   (https://crates.io/settings/profile adresinde e-posta doğrulaması gerekli)
 - E-posta doğrulandıktan sonra aynı commit'ten `cargo publish` yeterli (tekrar tag gerekmez)
+
+## Kapanış (2026-09-13)
+
+- `cargo publish` BAŞARILI — hbmon v0.1.0 crates.io'da
+- Not: tag `v0.1.0` → `a1c23be`, yayın → `f460817` (yalnızca task notu farkı, kod aynı)
