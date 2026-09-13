@@ -1,10 +1,20 @@
 [package]
 name = "hbmon"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 description = "Harness-independent, OS-independent build monitor for LLM-driven development"
 repository = "https://github.com/aydemir/hbmon"
+# İç süreç dosyaları registry'ye sızmasın (TASK-030).
+# HBMON-RFC.md kalır — README ona link veriyor.
+exclude = [
+  "AGENTS.md",
+  "tasks/",
+  ".github/",
+  ".codegraph/",
+  "docs/",
+  "index.json",
+]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
