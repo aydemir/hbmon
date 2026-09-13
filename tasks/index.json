@@ -363,5 +363,41 @@
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-026-readme-agents.md"
+  },
+  {
+    "id": "TASK-027",
+    "title": "UUID validasyon + 64-bit",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["security", "uuid", "contract"],
+    "depends_on": [],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-027-uuid-validation.md"
+  },
+  {
+    "id": "TASK-028",
+    "title": "JSON sözleşme kilidi",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["contract", "context-economy", "tests"],
+    "depends_on": ["TASK-027"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-028-contract-lock.md"
+  },
+  {
+    "id": "TASK-029",
+    "title": "log --event + list --state filtresi",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["cli", "context-economy", "operability"],
+    "depends_on": ["TASK-028"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-029-log-list-filters.md"
   }
 ]

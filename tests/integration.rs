@@ -724,3 +724,167 @@ fn log_cli_returns_tail_subset() {
         .output()
         .unwrap();
 }
+
+/// TASK-027: path kaçağı uuid hızlı reddedilir (daemon doğmaz, exit 3).
+#[test]
+fn watch_rejects_path_escape_uuid() {
+    for bad in ["../evil", "a/b", "a\\b", "sp ace"] {
+        let out = hbmon()
+            .args(["watch", "--detach", "--uuid", bad, "--", "sleep", "1"])
+            .timeout(Duration::from_secs(30))
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(3), "uuid {bad:?} reddedilmeli");
+        let err = String::from_utf8(out.stderr).unwrap();
+        assert!(err.contains("invalid --uuid"), "stderr: {err}");
+    }
+}
+
+/// TASK-028: ajan sözleşmesi — zorunlu alanlar kilitli.
+/// Alan silme/yeniden adlandırma bu testi kızartır; alan EKLEME serbest
+/// (kesin şekil değil, alt-küme assert edilir).
+#[test]
+fn contract_keys_stable() {
+    let id = uuid("contract");
+    let s = sock_for(&id);
+    let out = hbmon()
+        .args(watch_args(&id, sleep_cmd(30)))
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+
+    // status full: zarf + snapshot alanları.
+    let full = hbmon()
+        .args(["status", "--sock", &s])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(full.status.success());
+    let fv: Value = serde_json::from_slice(&full.stdout).unwrap();
+    assert_eq!(fv["ok"], true);
+    for k in [
+        "state",
+        "uuid",
+        "root_pid",
+        "root_cmd",
+        "started_at",
+        "elapsed_sec",
+        "metrics",
+        "tree",
+        "health",
+        "log_tail",
+        "last_event",
+    ] {
+        assert!(fv.get(k).is_some(), "full status alanı yok: {k}");
+    }
+    for k in [
+        "cpu_pct",
+        "rss_mb",
+        "io_read_mb",
+        "io_write_mb",
+        "fds_open",
+        "net_tcp",
+        "net_udp",
+    ] {
+        assert!(fv["metrics"].get(k).is_some(), "metrics alanı yok: {k}");
+    }
+    for k in [
+        "stall_score",
+        "threshold_sec",
+        "last_io_at",
+        "last_cpu_nonzero_at",
+        "last_child_spawn_at",
+    ] {
+        assert!(fv["health"].get(k).is_some(), "health alanı yok: {k}");
+    }
+
+    // status compact: en küçük kilitli set.
+    let compact = hbmon()
+        .args(["status", "--sock", &s, "--compact"])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(compact.status.success());
+    let cv: Value = serde_json::from_slice(&compact.stdout).unwrap();
+    assert_eq!(cv["ok"], true);
+    for k in ["state", "uuid", "elapsed_sec", "health", "last_event"] {
+        assert!(cv.get(k).is_some(), "compact alanı yok: {k}");
+    }
+    assert!(cv["health"]["stall_score"].is_number());
+    assert!(cv["health"]["threshold_sec"].is_number());
+
+    // log: zarf + satır şekli.
+    let l = hbmon()
+        .args(["log", "--sock", &s, "--tail", "5"])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(l.status.success());
+    let lv: Value = serde_json::from_slice(&l.stdout).unwrap();
+    assert_eq!(lv["ok"], true);
+    let lines = lv["lines"].as_array().expect("lines dizisi");
+    assert!(!lines.is_empty());
+    for e in lines {
+        let ev: Value =
+            serde_json::from_str(e.as_str().expect("satır string")).expect("satır JSON");
+        for k in ["ts", "v", "ev", "uuid"] {
+            assert!(ev.get(k).is_some(), "olay alanı yok: {k}");
+        }
+    }
+
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}
+
+/// TASK-029: `log --event` server-side filtre — eşleşmeyen boş döner,
+/// filtresiz davranış değişmez.
+#[test]
+fn log_event_filter_returns_matching_subset() {
+    let id = uuid("log-filter");
+    let s = sock_for(&id);
+    let out = hbmon()
+        .args(watch_args(&id, sleep_cmd(20)))
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+
+    let bogus = hbmon()
+        .args([
+            "log",
+            "--sock",
+            &s,
+            "--tail",
+            "10",
+            "--event",
+            "bogus-ev-xyz",
+        ])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(bogus.status.success());
+    let bv: Value = serde_json::from_slice(&bogus.stdout).unwrap();
+    assert_eq!(bv["ok"], true);
+    assert_eq!(bv["lines"].as_array().unwrap().len(), 0);
+
+    // Filtresiz hâlâ dolu (geriye uyumluluk).
+    let plain = hbmon()
+        .args(["log", "--sock", &s, "--tail", "10"])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(plain.status.success());
+    let pv: Value = serde_json::from_slice(&plain.stdout).unwrap();
+    assert!(!pv["lines"].as_array().unwrap().is_empty());
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}

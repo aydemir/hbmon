@@ -40,3 +40,6 @@
 | TASK-024 | out log cap (uzun build disk güvenliği) | done | P2 |
 | TASK-025 | dep pattern genişletme (yeni ekosistemler) | done | P2 |
 | TASK-026 | README ajan hızlı yolu güncelleme | done | P3 |
+| TASK-027 | UUID validasyon + 64-bit | done | P1 |
+| TASK-028 | JSON sözleşme kilidi | done | P1 |
+| TASK-029 | log --event + list --state filtresi | done | P2 |

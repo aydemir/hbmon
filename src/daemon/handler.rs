@@ -89,7 +89,9 @@ pub(crate) fn dispatch(req: Value, shared: &Shared, logger_path: &Path) -> Value
         }
         "log_tail" => {
             let n = req.get("n").and_then(|v| v.as_u64()).unwrap_or(20) as usize;
-            let lines = EventLogger::tail(logger_path, n);
+            // TASK-029: opsiyonel server-side olay filtresi (yoksa filtresiz).
+            let event = req.get("event").and_then(|v| v.as_str());
+            let lines = EventLogger::tail_filter(logger_path, n, event);
             let mut m = serde_json::Map::new();
             m.insert("lines".to_string(), json!(lines));
             ok_response(&id, m)

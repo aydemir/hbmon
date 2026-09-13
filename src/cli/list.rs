@@ -11,6 +11,26 @@ pub struct ListArgs {
     /// windows %TEMP%). Hermetik test ve özel durum dizinleri için.
     #[arg(long)]
     pub dir: Option<std::path::PathBuf>,
+    /// Yalnızca bu durumdakiler (`state` tam eşleşme; örn. `running`).
+    #[arg(long)]
+    pub state: Option<String>,
+    /// Yalnızca canlı (sock'a bağlanabilen) izleyiciler.
+    #[arg(long, default_value = "false")]
+    pub live_only: bool,
+}
+
+/// Client-side filtre (TASK-029): `state`/`live` zaten her aday için
+/// best-effort toplanır, filtre çıktıda uygulanır — protokol değişmez.
+fn keep(live: bool, state: &Value, want_state: &Option<String>, live_only: bool) -> bool {
+    if live_only && !live {
+        return false;
+    }
+    if let Some(w) = want_state {
+        if state.as_str() != Some(w.as_str()) {
+            return false;
+        }
+    }
+    true
 }
 
 /// Listeleme adayları: (uuid, adres, yaş-sn). Unix'te `<root>` içindeki
@@ -79,6 +99,9 @@ pub fn run(a: ListArgs) -> Result<i32, String> {
         } else {
             Value::Null
         };
+        if !keep(live, &state, &a.state, a.live_only) {
+            continue;
+        }
         out.push(json!({
             "uuid": uuid,
             "sock": paths::sock_display(&addr),
@@ -111,5 +134,22 @@ mod tests {
         );
         assert_eq!(uuid_from_base("hbmon-.sock"), None);
         assert_eq!(uuid_from_base("other-a3f9c1e2.sock"), None);
+    }
+
+    #[test]
+    fn keep_filters_state_and_liveness() {
+        use super::keep;
+        use serde_json::{json, Value};
+        let running = json!("running");
+        let null = Value::Null;
+        assert!(keep(true, &running, &None, false));
+        assert!(keep(false, &null, &None, false));
+        assert!(keep(true, &running, &Some("running".into()), false));
+        assert!(!keep(true, &running, &Some("done".into()), false));
+        // Ölü adayda state null'dur — state filtresi onu eler.
+        assert!(!keep(false, &null, &Some("running".into()), false));
+        assert!(keep(true, &running, &None, true));
+        assert!(!keep(false, &null, &None, true));
+        assert!(keep(true, &running, &Some("running".into()), true));
     }
 }

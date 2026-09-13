@@ -43,3 +43,10 @@ boyutunu ölçmek (<5MB hedefi doğrulanacak).
 - `cargo publish --dry-run --allow-dirty`: 92 dosya paketlendi, verify temiz, upload yapılmadı ✓
 - Metadata (description/license/repository) paketlemede sorunsuz
 - Token gelince tek adım kalır: `cargo publish` + `v*` tag (release.yml manuel de tetiklenebilir)
+
+## Hazırlık Notu 2 (2026-09-13 — TASK-027/028/029 sonrası)
+
+- `cargo build --locked --release`: ikilik **2.560.848 B (~2.44 MB)** (<5MB hedef ✓)
+- `cargo publish --dry-run --allow-dirty`: verify temiz, upload yapılmadı ✓
+- Release ikilik duman testi: watch → status --compact → log --event metric → wait done (code 0) ✓
+- Kalan: `cargo publish` + `git tag v0.1.0` (kullanıcı komutu bekleniyor)

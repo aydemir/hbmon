@@ -2,7 +2,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 use crate::daemon::{spawn_watch, MonitorConfig};
-use crate::util::generate_uuid;
+use crate::util::{generate_uuid, validate_uuid};
 
 #[derive(Debug, Parser)]
 pub struct WatchArgs {
@@ -39,6 +39,9 @@ pub struct WatchArgs {
 pub fn run(a: WatchArgs) -> Result<i32, String> {
     if a.cmd.is_empty() {
         return Err("usage: hbmon watch [--detach] -- <cmd> [args...]".to_string());
+    }
+    if let Some(ref u) = a.uuid {
+        validate_uuid(u)?;
     }
     let uuid = a.uuid.unwrap_or_else(generate_uuid);
     let mut cfg = MonitorConfig::new(uuid, a.sock, a.log, a.cmd, a.timeout_sec, a.label);

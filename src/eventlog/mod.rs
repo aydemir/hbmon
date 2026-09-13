@@ -82,16 +82,30 @@ impl EventLogger {
     }
 
     pub fn tail(path: &Path, n: usize) -> Vec<String> {
+        Self::tail_filter(path, n, None)
+    }
+
+    /// Son N satırın `event` alt-kümesi (TASK-029): `None` = filtresiz.
+    /// Eşleşme `new_event` şeklindeki `"ev":"<ad>"` alt-dizesinedir —
+    /// satırlar zaten compact-JSON olduğundan parse maliyeti yok.
+    pub fn tail_filter(path: &Path, n: usize, event: Option<&str>) -> Vec<String> {
         let file = match File::open(path) {
             Ok(f) => f,
             Err(_) => return vec![],
         };
         let reader = BufReader::new(file);
         let lines: Vec<String> = reader.lines().map_while(Result::ok).collect();
-        if lines.len() <= n {
-            lines
+        let kept: Vec<String> = match event {
+            Some(ev) => {
+                let needle = format!("\"ev\":\"{}\"", ev);
+                lines.into_iter().filter(|l| l.contains(&needle)).collect()
+            }
+            None => lines,
+        };
+        if kept.len() <= n {
+            kept
         } else {
-            lines[lines.len() - n..].to_vec()
+            kept[kept.len() - n..].to_vec()
         }
     }
 }
@@ -102,4 +116,44 @@ fn validate_tmp_path(p: &Path) -> Result<(), String> {
         return Err(format!("invalid path (parent dir): {}", s));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_lines(p: &Path, lines: &[&str]) {
+        use std::io::Write;
+        let mut f = File::create(p).unwrap();
+        for l in lines {
+            writeln!(f, "{}", l).unwrap();
+        }
+    }
+
+    #[test]
+    fn tail_filter_keeps_last_n_matching() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("t.jsonl");
+        write_lines(
+            &p,
+            &[
+                r#"{"v":1,"ev":"metric","uuid":"u"}"#,
+                r#"{"v":1,"ev":"exit","uuid":"u"}"#,
+                r#"{"v":1,"ev":"metric","uuid":"u"}"#,
+            ],
+        );
+        // Filtresiz = tail ile aynı.
+        assert_eq!(EventLogger::tail(&p, 2).len(), 2);
+        let m = EventLogger::tail_filter(&p, 10, Some("metric"));
+        assert_eq!(m.len(), 2);
+        assert!(m.iter().all(|l| l.contains(r#""ev":"metric""#)));
+        // Sınır eşleşenler içinden son N.
+        let one = EventLogger::tail_filter(&p, 1, Some("metric"));
+        assert_eq!(one.len(), 1);
+        // Eşleşmeyen + kayıp dosya = boş.
+        assert!(EventLogger::tail_filter(&p, 5, Some("bogus-ev")).is_empty());
+        assert!(
+            EventLogger::tail_filter(&dir.path().join("yok.jsonl"), 5, Some("metric")).is_empty()
+        );
+    }
 }
