@@ -62,8 +62,9 @@ This section is for LLM agents; the full contract is in `HBMON-RFC.md`
 4. `exec` is ephemeral: `sock`/`log` in the handshake are reserved names, no files
    are created — don't try `status`/`wait`.
 5. Discovery order: `--sock > $HBMON_SOCK > /tmp/hbmon-*.sock` (newest);
-   see all: `hbmon list` (read-only). For events:
-   `hbmon log --sock $SOCK --tail N` (don't cat the whole `.jsonl`).
+   see all: `hbmon list` (read-only; `--state running` / `--live-only` filter).
+   For events: `hbmon log --sock $SOCK --tail N` (don't cat the whole `.jsonl`;
+   `--event metric` returns only matching events).
 
 ## Status
 

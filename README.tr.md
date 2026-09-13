@@ -61,8 +61,9 @@ Bu bölüm LLM ajanları içindir; detaylı sözleşme `HBMON-RFC.md`'dedir, ora
 4. `exec` ephemeral'dır: handshake'teki `sock`/`log` rezerve addır, dosya
    oluşmaz — `status`/`wait` deneme.
 5. Keşif sırası: `--sock > $HBMON_SOCK > /tmp/hbmon-*.sock` (newest);
-   hepsini gör: `hbmon list` (salt-okunur). Olaylar için
-   `hbmon log --sock $SOCK --tail N` (tüm `.jsonl`'u cat'leme).
+   hepsini gör: `hbmon list` (salt-okunur; `--state running` / `--live-only` filtreler).
+   Olaylar için `hbmon log --sock $SOCK --tail N` (tüm `.jsonl`'u cat'leme;
+   `--event metric` yalnızca eşleşen olayları döndürür).
 
 ## Durum
 
