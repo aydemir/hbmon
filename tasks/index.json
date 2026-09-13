@@ -399,5 +399,17 @@
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-029-log-list-filters.md"
+  },
+  {
+    "id": "TASK-030",
+    "title": "Crate hijyeni + EN vitrin (v0.1.1)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["release", "packaging", "docs"],
+    "depends_on": ["TASK-002"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-030-crate-hygiene.md"
   }
 ]

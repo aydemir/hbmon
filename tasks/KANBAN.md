@@ -43,3 +43,4 @@
 | TASK-027 | UUID validasyon + 64-bit | done | P1 |
 | TASK-028 | JSON sözleşme kilidi | done | P1 |
 | TASK-029 | log --event + list --state filtresi | done | P2 |
+| TASK-030 | Crate hijyeni + EN vitrin (v0.1.1) | done | P2 |
