@@ -63,7 +63,8 @@ hbmon shutdown --sock ...
 
 This section is for LLM agents; the full contract is in [HBMON-RFC-EN.md](HBMON-RFC-EN.md)
 (Turkish original: [HBMON-RFC.md](HBMON-RFC.md)) — don't skip it. One-page English protocol summary:
-[PROTOCOL.md](PROTOCOL.md).
+[PROTOCOL.md](PROTOCOL.md). Consuming via bare CLI, skill, or plugin+MCP:
+[USAGE-PATTERNS.md](USAGE-PATTERNS.md).
 
 1. `hbmon watch --detach -- <cmd>` → stdout line 1 = handshake JSON
    `{v,ev:"ready",uuid,sock,log}`. Parse line 1, keep `sock`.

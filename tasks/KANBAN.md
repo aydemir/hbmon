@@ -49,3 +49,4 @@
 | TASK-033 | crates.io publish prosedürü + release.yml publish | done | P1 |
 | TASK-034 | Gerçek build smoke testi + stale/orphan politika dokümanı | done | P2 |
 | TASK-035 | HBMON-RFC İngilizce çevirisi (HBMON-RFC-EN.md) | done | P2 |
+| TASK-036 | Tüketici desenleri belgesi (salt CLI / skill / plugin+MCP) | done | P2 |

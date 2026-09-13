@@ -471,5 +471,17 @@
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-035-rfc-english-translation.md"
+  },
+  {
+    "id": "TASK-036",
+    "title": "Tüketici desenleri belgesi (salt CLI / skill / plugin+MCP)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["docs", "agents", "harness"],
+    "depends_on": ["TASK-032"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-036-usage-patterns.md"
   }
 ]

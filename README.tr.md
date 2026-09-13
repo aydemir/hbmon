@@ -63,6 +63,7 @@ hbmon shutdown --sock ...
 
 Bu bölüm LLM ajanları içindir; detaylı sözleşme [HBMON-RFC.md](./HBMON-RFC.md)'dedir, orayı ıskalamayın.
 Tek sayfalık İngilizce protokol özeti: [PROTOCOL.md](PROTOCOL.md).
+Salt CLI / skill / plugin+MCP tüketim desenleri: [USAGE-PATTERNS.md](USAGE-PATTERNS.md).
 
 1. `hbmon watch --detach -- <cmd>` → stdout satır 1 = handshake JSON
    `{v,ev:"ready",uuid,sock,log}`. Satır 1'i parse et, `sock`'u sakla.
