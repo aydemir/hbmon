@@ -1,7 +1,7 @@
 ---
 id: TASK-030
 title: "Crate hijyeni + EN vitrin (v0.1.1)"
-status: todo
+status: done
 priority: P2
 created: 2026-09-13
 updated: 2026-09-13
