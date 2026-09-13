@@ -303,5 +303,65 @@
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-021-dep-offset-race.md"
+  },
+  {
+    "id": "TASK-022",
+    "title": "cleanup canlı-daemon koruması",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["cli", "operability", "gc", "correctness"],
+    "depends_on": [],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-022-cleanup-live-guard.md"
+  },
+  {
+    "id": "TASK-023",
+    "title": "hbmon log CLI (log_tail op)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["cli", "context-economy", "operability"],
+    "depends_on": [],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-023-log-cli.md"
+  },
+  {
+    "id": "TASK-024",
+    "title": "out log cap (uzun build disk güvenliği)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["daemon", "robustness", "disk"],
+    "depends_on": ["TASK-009"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-024-log-cap.md"
+  },
+  {
+    "id": "TASK-025",
+    "title": "dep pattern genişletme (yeni ekosistemler)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["health", "dep-missing"],
+    "depends_on": ["TASK-001"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-025-dep-patterns.md"
+  },
+  {
+    "id": "TASK-026",
+    "title": "README ajan hızlı yolu güncelleme",
+    "status": "done",
+    "priority": "P3",
+    "environment": "both",
+    "labels": ["docs", "agents"],
+    "depends_on": ["TASK-015", "TASK-016", "TASK-017"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-026-readme-agents.md"
   }
 ]

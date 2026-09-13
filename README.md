@@ -51,13 +51,16 @@ Bu bölüm LLM ajanları içindir; detaylı sözleşme `HBMON-RFC.md`'dedir, ora
 
 1. `hbmon watch --detach -- <cmd>` → stdout satır 1 = handshake JSON
    `{v,ev:"ready",uuid,sock,log}`. Satır 1'i parse et, `sock`'u sakla.
-2. Poll: `hbmon status --sock $SOCK`, veya bloklan:
-   `hbmon wait --sock $SOCK --until done,failed,dep_missing,timeout`.
+2. Poll: `hbmon status --sock $SOCK` (ucuz yoklama: `--compact`), veya bloklan:
+   `hbmon wait --sock $SOCK --until done,failed,dep_missing,timeout,stall_suspect,oom_suspect`
+   (alyas: `stalled`, `oom_killed`; bilinmeyen ad → `INVALID_UNTIL`, exit 3).
 3. Exit: `0 done / 1 failed / 2 dep-missing / 124 timeout / 137 oom / 3 iç hata`.
    `2` ise eksik paketi kur + yeniden dene.
 4. `exec` ephemeral'dır: handshake'teki `sock`/`log` rezerve addır, dosya
    oluşmaz — `status`/`wait` deneme.
-5. Keşif sırası: `--sock > $HBMON_SOCK > /tmp/hbmon-*.sock` (newest).
+5. Keşif sırası: `--sock > $HBMON_SOCK > /tmp/hbmon-*.sock` (newest);
+   hepsini gör: `hbmon list` (salt-okunur). Olaylar için
+   `hbmon log --sock $SOCK --tail N` (tüm `.jsonl`'u cat'leme).
 
 ## Durum
 

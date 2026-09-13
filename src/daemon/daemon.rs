@@ -42,6 +42,8 @@ pub struct MonitorConfig {
     pub timeout_sec: Option<u64>,
     pub label: Option<String>,
     pub workdir: PathBuf,
+    /// `.out` üst sınırı bayt (TASK-024, opt-in; None = sınırsız).
+    pub max_log_bytes: Option<u64>,
 }
 
 impl MonitorConfig {
@@ -72,6 +74,7 @@ impl MonitorConfig {
             timeout_sec,
             label,
             workdir,
+            max_log_bytes: None,
         }
     }
 }
@@ -306,6 +309,18 @@ fn poll_once(ctx: &mut PollCtx, st: &mut Poll) -> bool {
             *ctx.shared.last_event.lock().unwrap() = ev.clone();
             *ctx.shared.dep_info.lock().unwrap() = Some(ev);
             st.dep_found = Some(dm);
+        }
+    }
+
+    // .out üst sınırı (TASK-024, opt-in): aşınca son yarıyı tut (histerezis).
+    // Taranmış satırlar zaten commit'li (`dep_found` guard); offset resetini
+    // `scan_out_for_dep` yönetir (`len < offset` → 0).
+    if let Some(cap) = ctx.cfg.max_log_bytes {
+        if let Ok(len) = std::fs::metadata(&ctx.cfg.out).map(|m| m.len()) {
+            if len > cap {
+                let keep = (cap / 2).max(65536);
+                let _ = truncate_tail(&ctx.cfg.out, keep);
+            }
         }
     }
 
@@ -572,6 +587,28 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
     Ok(())
 }
 
+/// `.out` budama (TASK-024): dosya `keep` bayttan uzunsa son `keep` baytı
+/// tutar, yeni uzunluğu döner. Zaten kısaysa dokunmaz. Child O_APPEND ile
+/// yazdığından budama sonrası append'ler dosya sonuna düşer — güvenli.
+/// Budama anında yazılan baytlar kaybolabilir; caller (tick) bunu seyrek
+/// (yalnızca sınır aşımında) yapar, dep taraması offset-resetiyle toparlar.
+fn truncate_tail(out: &Path, keep: u64) -> std::io::Result<u64> {
+    use std::io::{Read, Seek, SeekFrom, Write};
+    let len = std::fs::metadata(out)?.len();
+    if len <= keep {
+        return Ok(len);
+    }
+    let mut f = std::fs::File::open(out)?;
+    f.seek(SeekFrom::Start(len - keep))?;
+    let mut tail = Vec::with_capacity(keep as usize);
+    f.read_to_end(&mut tail)?;
+    let mut w = std::fs::File::create(out)?;
+    w.write_all(&tail)?;
+    w.flush()?;
+    secure_fix(out);
+    Ok(tail.len() as u64)
+}
+
 /// Incremental dep-scan (TASK-009): reads only bytes appended since the last
 /// tick instead of the whole `.out` file. A trailing partial line (build
 /// still writing, no `\n` yet) is held back — the offset stays before it so
@@ -654,5 +691,48 @@ mod tests {
         // truncate/rotate resets the offset instead of going blind
         std::fs::write(&path, "fresh start\n").unwrap();
         assert!(scan_out_for_dep(&path, &mut off).is_none());
+    }
+
+    #[test]
+    fn truncate_tail_keeps_suffix() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("big.out");
+        let body: Vec<u8> = (0..100_000u32).map(|i| (i % 251) as u8).collect();
+        std::fs::write(&path, &body).unwrap();
+        let new_len = truncate_tail(&path, 30_000).unwrap();
+        assert_eq!(new_len, 30_000);
+        let back = std::fs::read(&path).unwrap();
+        assert_eq!(back, body[body.len() - 30_000..]);
+    }
+
+    #[test]
+    fn truncate_tail_short_file_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("small.out");
+        std::fs::write(&path, "tiny\n").unwrap();
+        assert_eq!(truncate_tail(&path, 30_000).unwrap(), 5);
+        assert_eq!(std::fs::read(&path).unwrap(), b"tiny\n");
+    }
+
+    #[test]
+    fn dep_scan_recovers_after_truncate() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cut.out");
+        let mut f = std::fs::File::create(&path).unwrap();
+        use std::io::Write as _;
+        for _ in 0..2000 {
+            writeln!(f, "filler line for bulk").unwrap();
+        }
+        writeln!(f, "Cannot find module 'x'").unwrap();
+        drop(f);
+        let mut off = 0u64;
+        assert!(scan_out_for_dep(&path, &mut off).is_some());
+        let scanned = off;
+        assert!(scanned > 0);
+        truncate_tail(&path, 10_000).unwrap();
+        // offset artık dosya sonunun gerisinde → resetleyip toparlar
+        let dm = scan_out_for_dep(&path, &mut off).expect("retained tail scans");
+        assert_eq!(dm.pattern_id, "npm_module");
+        assert!(off <= 10_000);
     }
 }

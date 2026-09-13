@@ -35,3 +35,8 @@
 | TASK-019 | drift kilidi + boyut kapısı | done | P2 |
 | TASK-020 | release unblock hazırlığı | done | P1 |
 | TASK-021 | dep-offset yarışı | done | P1 |
+| TASK-022 | cleanup canlı-daemon koruması | done | P1 |
+| TASK-023 | hbmon log CLI (log_tail op) | done | P2 |
+| TASK-024 | out log cap (uzun build disk güvenliği) | done | P2 |
+| TASK-025 | dep pattern genişletme (yeni ekosistemler) | done | P2 |
+| TASK-026 | README ajan hızlı yolu güncelleme | done | P3 |

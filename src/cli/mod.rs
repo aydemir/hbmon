@@ -1,6 +1,7 @@
 pub mod exec;
 pub mod kill;
 pub mod list;
+pub mod log;
 pub mod shutdown;
 pub mod status;
 pub mod wait;
@@ -35,6 +36,8 @@ pub enum Commands {
     Shutdown(shutdown::ShutdownArgs),
     /// List known monitors (read-only discovery)
     List(list::ListArgs),
+    /// Show recent event log lines (read-only)
+    Log(log::LogArgs),
     /// Remove stale pid/sock files
     Cleanup(CleanupArgs),
 }
@@ -44,6 +47,10 @@ pub struct CleanupArgs {
     /// Remove files older than N seconds (default 86400)
     #[arg(long, default_value = "86400")]
     pub older_than: u64,
+    /// Taranacak dizin (varsayılan: platform convention — unix /tmp).
+    /// `list --dir` ile aynı kök.
+    #[arg(long)]
+    pub dir: Option<PathBuf>,
 }
 
 pub fn dispatch(cli: Cli) -> Result<i32, String> {
@@ -55,6 +62,7 @@ pub fn dispatch(cli: Cli) -> Result<i32, String> {
         Commands::Kill(a) => kill::run(a),
         Commands::Shutdown(a) => shutdown::run(a),
         Commands::List(a) => list::run(a),
+        Commands::Log(a) => log::run(a),
         Commands::Cleanup(a) => run_cleanup(a),
     }
 }
@@ -75,36 +83,88 @@ pub fn resolve_sock(explicit: Option<PathBuf>) -> Result<SockAddr, String> {
 }
 
 fn run_cleanup(a: CleanupArgs) -> Result<i32, String> {
+    let root = a.dir.unwrap_or_else(paths::scan_dir);
     let now = std::time::SystemTime::now();
+    let entries: Vec<(String, PathBuf)> = std::fs::read_dir(&root)
+        .map(|d| {
+            d.flatten()
+                .map(|e| (e.file_name().to_string_lossy().to_string(), e.path()))
+                .filter(|(n, _)| {
+                    n.starts_with("hbmon-")
+                        && (n.ends_with(".sock")
+                            || n.ends_with(".pid")
+                            || n.ends_with(".jsonl")
+                            || n.ends_with(".out"))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    // Canlı guard (TASK-022): sock'u dinlenen daemon'un kardeş dosyalarına
+    // (.jsonl/.out/.pid) dokunma — yaşa bakılmaksızın.
+    let live: std::collections::HashSet<String> = entries
+        .iter()
+        .filter(|(n, p)| {
+            n.ends_with(".sock") && crate::ipc::can_connect(&paths::from_explicit(p.clone()))
+        })
+        .filter_map(|(n, _)| paths::uuid_from_base(n))
+        .collect();
     let mut removed = 0u32;
-    if let Ok(dir) = std::fs::read_dir(paths::scan_dir()) {
-        for e in dir.flatten() {
-            let name = e.file_name().to_string_lossy().to_string();
-            if !(name.starts_with("hbmon-")
-                && (name.ends_with(".sock")
-                    || name.ends_with(".pid")
-                    || name.ends_with(".jsonl")
-                    || name.ends_with(".out")))
-            {
-                continue;
-            }
-            let age_ok = e
-                .metadata()
-                .and_then(|m| m.modified())
-                .ok()
-                .and_then(|mt| now.duration_since(mt).ok())
-                .map(|d| d.as_secs() > a.older_than)
-                .unwrap_or(false);
-            // sockets: only remove if nobody listens (stale)
-            if name.ends_with(".sock") && crate::ipc::can_connect(&paths::from_explicit(e.path())) {
-                continue;
-            }
-            if age_ok {
-                std::fs::remove_file(e.path()).ok();
-                removed += 1;
-            }
+    for (name, path) in &entries {
+        let age_ok = std::fs::metadata(path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|mt| now.duration_since(mt).ok())
+            .map(|d| d.as_secs() > a.older_than)
+            .unwrap_or(false);
+        if age_ok && sweep_decision(name, &live) {
+            std::fs::remove_file(path).ok();
+            removed += 1;
         }
     }
     println!("{{\"removed\":{}}}", removed);
     Ok(0)
+}
+
+/// Silme kararı (TASK-022, saf mantık — birim testli): canlı ailenin
+/// dosyaları yaşa bakılmaksızın korunur; diğerleri yaş kuralına kalır.
+fn sweep_decision(name: &str, live: &std::collections::HashSet<String>) -> bool {
+    if let Some(u) = paths::uuid_from_base(name) {
+        if live.contains(&u) {
+            return false;
+        }
+    }
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn live_set(names: &[&str]) -> std::collections::HashSet<String> {
+        names.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn live_family_protected_despite_age() {
+        let live = live_set(&["abc123"]);
+        assert!(!sweep_decision("hbmon-abc123.sock", &live));
+        assert!(!sweep_decision("hbmon-abc123.jsonl", &live));
+        assert!(!sweep_decision("hbmon-abc123.out", &live));
+        assert!(!sweep_decision("hbmon-abc123.pid", &live));
+    }
+
+    #[test]
+    fn dead_files_not_protected() {
+        // Yaş kuralı caller'da (`age_ok`); burası yalnız aile-koruma kararı:
+        // ölü uuid'ler korunmaz.
+        let live = live_set(&["abc123"]);
+        assert!(sweep_decision("hbmon-dead-x.sock", &live));
+        assert!(sweep_decision("hbmon-dead-x.jsonl", &live));
+    }
+
+    #[test]
+    fn empty_live_set_sweeps_all() {
+        let live = live_set(&[]);
+        assert!(sweep_decision("hbmon-abc123.sock", &live));
+    }
 }

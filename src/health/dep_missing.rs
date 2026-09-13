@@ -66,6 +66,21 @@ static PATTERNS: Lazy<Vec<Pat>> = Lazy::new(|| {
             "dep_missing:link",
             r"error: linking with \S+ failed"
         ),
+        // TASK-025: ekosistem desenleri (sona eklenir — mevcut eşleşmeler korunur).
+        pat!(
+            "go_module",
+            "dep_missing:go",
+            r"no required module provides package"
+        ),
+        pat!("go_sum", "dep_missing:go", r"missing go\.sum entry"),
+        pat!(
+            "pip_dist",
+            "dep_missing:pip",
+            r"No matching distribution found for"
+        ),
+        pat!("apt_pkg", "dep_missing:apt", r"Unable to locate package"),
+        pat!("nuget_pkg", "dep_missing:nuget", r"Unable to find package"),
+        pat!("brew_formula", "dep_missing:brew", r"No available formula"),
     ]
 });
 
@@ -224,5 +239,82 @@ mod tests {
         let m = match_line_with("sh: foo: command not found", &customs).unwrap();
         assert_eq!(m.pattern_id, "my-cmd");
         assert_eq!(m.category, "dep_missing:custom");
+    }
+
+    // TASK-025: ekosistem desenleri — her biri match + no-match kilidi.
+    #[test]
+    fn go_module_matches() {
+        let m = match_line(
+            "main.go:5:2: no required module provides package github.com/foo/bar; to add it:",
+        )
+        .unwrap();
+        assert_eq!(m.pattern_id, "go_module");
+        assert_eq!(m.category, "dep_missing:go");
+    }
+
+    #[test]
+    fn go_download_progress_no_match() {
+        assert!(match_line("go: downloading github.com/foo/bar v1.2.3").is_none());
+    }
+
+    #[test]
+    fn go_sum_matches() {
+        let m = match_line("missing go.sum entry for module providing package github.com/foo/bar")
+            .unwrap();
+        assert_eq!(m.pattern_id, "go_sum");
+    }
+
+    #[test]
+    fn go_verify_progress_no_match() {
+        assert!(match_line("go: verifying github.com/foo/bar v1.2.3").is_none());
+    }
+
+    #[test]
+    fn pip_dist_matches() {
+        let m = match_line("ERROR: No matching distribution found for numpy==99.0").unwrap();
+        assert_eq!(m.pattern_id, "pip_dist");
+        assert_eq!(m.category, "dep_missing:pip");
+    }
+
+    #[test]
+    fn pip_success_no_match() {
+        assert!(match_line("Successfully installed numpy-2.0.0").is_none());
+    }
+
+    #[test]
+    fn apt_pkg_matches() {
+        let m = match_line("E: Unable to locate package nonexistent-xyz").unwrap();
+        assert_eq!(m.pattern_id, "apt_pkg");
+        assert_eq!(m.category, "dep_missing:apt");
+    }
+
+    #[test]
+    fn apt_list_progress_no_match() {
+        assert!(match_line("Reading package lists... Done").is_none());
+    }
+
+    #[test]
+    fn nuget_pkg_matches() {
+        let m = match_line("error NU1101: Unable to find package NoSuch.Package.").unwrap();
+        assert_eq!(m.pattern_id, "nuget_pkg");
+        assert_eq!(m.category, "dep_missing:nuget");
+    }
+
+    #[test]
+    fn nuget_restore_ok_no_match() {
+        assert!(match_line("Restored /tmp/x.csproj (in 1.2s)").is_none());
+    }
+
+    #[test]
+    fn brew_formula_matches() {
+        let m =
+            match_line("Error: No available formula with the name of \"no-such-foo\".").unwrap();
+        assert_eq!(m.pattern_id, "brew_formula");
+        assert_eq!(m.category, "dep_missing:brew");
+    }
+
+    #[test]
+    fn brew_pour_progress_no_match() {
+        assert!(match_line("==> Pouring foo-1.0.tar.gz").is_none());
     }
 }

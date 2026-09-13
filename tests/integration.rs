@@ -608,3 +608,119 @@ fn list_shows_live_monitors_by_uuid() {
         .output()
         .unwrap();
 }
+
+/// `cleanup --older-than 0` canlı daemon dosyalarını korur, ölü süsleri süpürür.
+///
+/// NOT: proot-sandbox altında YOKSAYILIR (list testiyle aynı gerekçe —
+/// taze dosyalar readdir/lookup'ta oynak; `touch`'lanan dosya bile 1sn
+/// sonra ENOENT verdi, arada hiç süreç yokken). Gerçek çekirdekte
+/// (CI + Windows makine) `-- --ignored` ile koşar. Koruma mantığı ayrıca
+/// `cli::tests` unit'leriyle kilitli (deterministik, her yerde yeşil).
+#[test]
+#[ignore = "proot sandbox: fresh files vanish from /tmp; runs on real kernels (CI + Windows box)"]
+fn cleanup_protects_live_daemon_files() {
+    // Hermetik: izole dizin + açık --sock (ortam /tmp'sine dokunmaz).
+    let dir = tempfile::tempdir().unwrap();
+    let dir_s = dir.path().to_string_lossy().to_string();
+    let id = uuid("cleanup-guard");
+    let sock = dir
+        .path()
+        .join("hbmon-guard.sock")
+        .to_string_lossy()
+        .to_string();
+    let mut args = vec![
+        "watch".to_string(),
+        "--detach".to_string(),
+        "--uuid".to_string(),
+        id.clone(),
+        "--sock".to_string(),
+        sock.clone(),
+        "--".to_string(),
+    ];
+    args.extend(sleep_cmd(30));
+    let out = hbmon()
+        .args(args)
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&sock);
+    // Ölü süsler: canlılık yok, yaş var → süpürülmeli.
+    std::fs::write(dir.path().join("hbmon-dead-x.sock"), b"").unwrap();
+    std::fs::write(dir.path().join("hbmon-dead-x.jsonl"), b"").unwrap();
+    // Yaş kuralı `as_secs() > older_than` — aynı saniye tuzağına düşmemek için.
+    std::thread::sleep(Duration::from_millis(1100));
+    let c = hbmon()
+        .args(["cleanup", "--dir", &dir_s, "--older-than", "0"])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(c.status.success());
+    let cv: Value = serde_json::from_slice(&c.stdout).unwrap();
+    assert_eq!(cv["removed"], 2, "yalnızca ölü süsler: {}", c.stdout.len());
+    // Canlı koruması: sock yerinde, daemon hizmette.
+    #[cfg(unix)]
+    assert!(
+        dir.path().join("hbmon-guard.sock").exists(),
+        "canlı sock silinmemeli"
+    );
+    let st = hbmon()
+        .args(["status", "--sock", &sock])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(st.status.success());
+    // Kapanınca dizin boşalır (daemon pidfile+sock'u kendisi kaldırır).
+    hbmon()
+        .args(["shutdown", "--sock", &sock])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+    loop {
+        let left: Vec<_> = std::fs::read_dir(dir.path()).unwrap().flatten().collect();
+        if left.is_empty() {
+            break;
+        }
+        if std::time::Instant::now() >= deadline {
+            panic!("dizin boşalmadı: {:?}", left);
+        }
+        std::thread::sleep(Duration::from_millis(300));
+    }
+}
+
+#[test]
+fn log_cli_returns_tail_subset() {
+    let id = uuid("log-cli");
+    let s = sock_for(&id);
+    let out = hbmon()
+        .args(watch_args(&id, sleep_cmd(20)))
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+
+    let l = hbmon()
+        .args(["log", "--sock", &s, "--tail", "3"])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(l.status.success());
+    let v: Value = serde_json::from_slice(&l.stdout).unwrap();
+    assert_eq!(v["ok"], true);
+    let lines = v["lines"].as_array().expect("lines dizisi");
+    assert!(!lines.is_empty(), "olay günlüğü boş olmamalı");
+    assert!(lines.len() <= 3, "tail sınırı: {}", lines.len());
+    for e in lines {
+        // tail ham satır döner (string) — JSON parse edilebilir olmalı
+        let s = e.as_str().expect("satır string");
+        let ev: Value = serde_json::from_str(s).expect("satır JSON olmalı");
+        assert_eq!(ev["uuid"], id.as_str());
+    }
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}

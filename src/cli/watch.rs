@@ -27,6 +27,10 @@ pub struct WatchArgs {
     /// Human label (future multi-build use)
     #[arg(long)]
     pub label: Option<String>,
+    /// Cap build output log at N megabytes (opt-in; default unbounded).
+    /// Exceeded → keep last half, dep-scan offset resets (TASK-024).
+    #[arg(long)]
+    pub max_log_mb: Option<u64>,
     /// Build command after `--`
     #[arg(last = true)]
     pub cmd: Vec<String>,
@@ -37,7 +41,8 @@ pub fn run(a: WatchArgs) -> Result<i32, String> {
         return Err("usage: hbmon watch [--detach] -- <cmd> [args...]".to_string());
     }
     let uuid = a.uuid.unwrap_or_else(generate_uuid);
-    let cfg = MonitorConfig::new(uuid, a.sock, a.log, a.cmd, a.timeout_sec, a.label);
+    let mut cfg = MonitorConfig::new(uuid, a.sock, a.log, a.cmd, a.timeout_sec, a.label);
+    cfg.max_log_bytes = a.max_log_mb.map(|m| m.saturating_mul(1024 * 1024));
     if a.detach {
         // spawn_watch double-forks; the caller (LLM shell) returns immediately.
         // Print handshake BEFORE forking so the LLM captures uuid/sock/log.

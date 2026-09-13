@@ -868,7 +868,8 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 - [x] Linux tam izleme + macOS süreç gözetimi
 - [x] Daemonization, UDS JSON-RPC, JSONL, exit mapping
 - [x] Stall/OOM/dep-missing/timeout (ETA gelecek — v1'de `eta_sec` dönülmüyor)
-- [x] CLI: watch, status, wait, exec, kill, shutdown, cleanup
+- [x] CLI: watch, status, wait, exec, kill, shutdown, cleanup, list, log
+  (+`status --compact`, `wait --until` sözlüğü, `cleanup --dir`, `watch --max-log-mb`)
 - [x] 41 unit + 7 integration test (2026-09-09, `cargo test --locked -j2` yeşil)
 
 ### 14.2 v1.5
