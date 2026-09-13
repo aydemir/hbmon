@@ -17,7 +17,7 @@
   {
     "id": "TASK-002",
     "title": "Release + crates.io yayını",
-    "status": "in_progress",
+    "status": "done",
     "priority": "P1",
     "environment": "both",
     "labels": [
@@ -27,7 +27,7 @@
     "depends_on": [],
     "created": "2026-09-09",
     "updated": "2026-09-13",
-    "file": "tasks/in-progress/TASK-002-release-cratesio.md"
+    "file": "tasks/done/TASK-002-release-cratesio.md"
   },
   {
     "id": "TASK-003",
