@@ -50,3 +50,10 @@ boyutunu ölçmek (<5MB hedefi doğrulanacak).
 - `cargo publish --dry-run --allow-dirty`: verify temiz, upload yapılmadı ✓
 - Release ikilik duman testi: watch → status --compact → log --event metric → wait done (code 0) ✓
 - Kalan: `cargo publish` + `git tag v0.1.0` (kullanıcı komutu bekleniyor)
+
+## Yayın Denemesi (2026-09-13)
+
+- Commit `a1c23be` push'landı, `git tag v0.1.0` push'landı (release.yml 4 platform derlemesi tetiklendi)
+- `cargo publish` BAŞARISIZ: crates.io 400 — "A verified email address is required"
+  (https://crates.io/settings/profile adresinde e-posta doğrulaması gerekli)
+- E-posta doğrulandıktan sonra aynı commit'ten `cargo publish` yeterli (tekrar tag gerekmez)
