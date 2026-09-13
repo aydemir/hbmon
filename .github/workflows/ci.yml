@@ -19,3 +19,30 @@ jobs:
         run: cargo build --locked
       - name: test
         run: cargo test --locked -j2
+      # Ortam-bağımlı kilitli testler (proot-sandbox'da #[ignore];
+      # gerçek çekirdekte koşmalı): şimdilik yalnızca list keşfi.
+      - name: test-ignored
+        run: cargo test --locked -j2 -- --ignored
+
+  # TASK-019: ikilik boyut kapısı — bilgi amaçlı (fail değil, uyarı).
+  # Hedef: <5MB (strip+LTO release). Sapmada önce README satırı güncellenir.
+  size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: release size
+        shell: bash
+        run: |
+          cargo build --locked --release
+          bin="target/release/hbmon"
+          ls -la "$bin"
+          bytes=$(stat -c%s "$bin")
+          mb=$(python3 -c "print($bytes/1048576)")
+          echo "release binary: ${mb} MiB ($bytes bytes)"
+          echo "SIZE_MIB=$mb" >> "$GITHUB_ENV"
+          if python3 -c "import sys; sys.exit(0 if $bytes < 5*1048576 else 1)"; then
+            echo "size gate OK (<5MiB)"
+          else
+            echo "::warning::release binary ${mb} MiB exceeds 5MiB budget"
+          fi

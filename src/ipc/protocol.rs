@@ -18,10 +18,45 @@ pub struct Request {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub force: Option<bool>,
     /// wait: erken dönüş için izlenecek sinyaller
-    /// (done, dep_missing, stall_suspect, oom_suspect, …).
+    /// (done, failed, dep_missing, timeout, stall_suspect, oom_suspect).
     /// Yoksa yalnızca terminal state'lerde dönülür (eski davranış).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub until: Option<Vec<String>>,
+    /// status: compact snapshot (TASK-016, opt-in; yoksa full).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compact: Option<bool>,
+}
+
+/// UDS op sözlüğü (TASK-019 drift kilidi): RFC'deki op tablosunun kod
+/// karşılığı. Yeni op eklenirse burası + `dispatch` + RFC tablosu +
+/// `tests/drift.rs` birlikte güncellenir; test sessiz kaymayı yakalar.
+pub const IPC_OPS: &[&str] = &["status", "metrics", "log_tail", "wait", "kill", "shutdown"];
+
+/// `wait --until` sinyal sözlüğü (TASK-015): kanonik adlar.
+/// `woke_on` istekte yazılan adı aynen yansıtır (kanonikleştirme yok).
+pub const WAIT_SIGNALS: &[&str] = &[
+    "done",
+    "failed",
+    "dep_missing",
+    "timeout",
+    "stall_suspect",
+    "oom_suspect",
+];
+
+/// Eski/alyas adlar: (alyas, kanonik). `wait_match` iki yazımı da kabul eder.
+pub const WAIT_ALIASES: &[(&str, &str)] =
+    &[("stalled", "stall_suspect"), ("oom_killed", "oom_suspect")];
+
+/// `until` listesindeki ilk bilinmeyen sinyal adını döner (yoksa `None`).
+/// Boş liste her zaman geçerlidir (yalnızca terminal state'ler).
+pub fn validate_until(until: &[String]) -> Option<String> {
+    until
+        .iter()
+        .find(|w| {
+            let s = w.as_str();
+            !WAIT_SIGNALS.contains(&s) && !WAIT_ALIASES.iter().any(|(a, _)| *a == s)
+        })
+        .cloned()
 }
 
 impl Request {
@@ -36,6 +71,7 @@ impl Request {
             n: None,
             force: None,
             until: None,
+            compact: None,
         }
     }
 }
@@ -101,5 +137,30 @@ mod tests {
         let back: Request = serde_json::from_str(&s).unwrap();
         assert_eq!(back.op, "wait");
         assert_eq!(back.timeout_sec, Some(30.0));
+    }
+
+    #[test]
+    fn validate_until_accepts_canonical_and_aliases() {
+        let ok = [
+            "done",
+            "failed",
+            "dep_missing",
+            "timeout",
+            "stall_suspect",
+            "oom_suspect",
+            "stalled",
+            "oom_killed",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect::<Vec<_>>();
+        assert_eq!(validate_until(&ok), None);
+        assert_eq!(validate_until(&[]), None);
+    }
+
+    #[test]
+    fn validate_until_rejects_unknown_first() {
+        let u = ["done".to_string(), "bogus".to_string()];
+        assert_eq!(validate_until(&u), Some("bogus".to_string()));
     }
 }

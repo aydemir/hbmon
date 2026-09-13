@@ -13,11 +13,18 @@ pub struct StatusArgs {
     pub sock: Option<PathBuf>,
     #[arg(long, default_value = "json")]
     pub format: String,
+    /// Compact snapshot: state/uuid/elapsed/health(last_event, code varsa).
+    /// tree/metrics-detay/log_tail yok — poll maliyeti düşer (TASK-016).
+    #[arg(long, default_value = "false")]
+    pub compact: bool,
 }
 
 pub fn run(a: StatusArgs) -> Result<i32, String> {
     let sock = resolve_sock(a.sock)?;
-    let req = json!({"v":1,"op":"status","id":generate_uuid()});
+    let mut req = json!({"v":1,"op":"status","id":generate_uuid()});
+    if a.compact {
+        req["compact"] = json!(true);
+    }
     let resp = send_request(&sock, &req, 10)?;
     if a.format == "pretty" {
         println!("{}", serde_json::to_string_pretty(&resp).unwrap());

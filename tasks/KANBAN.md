@@ -26,3 +26,12 @@
 | TASK-010 | DepMatch birlestirme | done | P3 |
 | TASK-011 | run_daemon bolme | done | P3 |
 | TASK-012 | test uuid cakisma sertlestirme | done | P3 |
+| TASK-013 | Pull vs wrapper-push canlı deney + sidecar | done | P2 |
+| TASK-014 | daemon dispatch split | done | P3 |
+| TASK-015 | wait --until sinyal normalizasyonu | done | P1 |
+| TASK-016 | status context ekonomisi (compact) | done | P1 |
+| TASK-017 | sock keşif + gc (list/prune) | done | P2 |
+| TASK-018 | health sağlamlık (oom+stall) | done | P2 |
+| TASK-019 | drift kilidi + boyut kapısı | done | P2 |
+| TASK-020 | release unblock hazırlığı | done | P1 |
+| TASK-021 | dep-offset yarışı | done | P1 |

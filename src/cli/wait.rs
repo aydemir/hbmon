@@ -15,8 +15,10 @@ pub struct WaitArgs {
     pub timeout: f64,
     #[arg(long, default_value = "500")]
     pub poll_ms: u64,
-    /// Erken dönüş sinyalleri (virgüllü): done,dep_missing,stall_suspect,oom_suspect.
-    /// Yoksa yalnızca bitişte dönülür.
+    /// Erken dönüş sinyalleri (virgüllü).
+    /// Kanonik: done,failed,dep_missing,timeout,stall_suspect,oom_suspect.
+    /// Alyas: stalled (=stall_suspect), oom_killed (=oom_suspect).
+    /// Yoksa yalnızca bitişte dönülür. Bilinmeyen ad hata verir (INVALID_UNTIL).
     #[arg(long)]
     pub until: Option<String>,
 }
@@ -28,12 +30,19 @@ pub fn run(a: WaitArgs) -> Result<i32, String> {
         "timeout_sec": a.timeout, "poll_ms": a.poll_ms,
     });
     if let Some(u) = &a.until {
-        let list: Vec<&str> = u
+        let list: Vec<String> = u
             .split(',')
-            .map(|s| s.trim())
+            .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
         if !list.is_empty() {
+            if let Some(bad) = crate::ipc::protocol::validate_until(&list) {
+                return Err(format!(
+                    "INVALID_UNTIL: unknown until signal: {} (valid: {})",
+                    bad,
+                    crate::ipc::protocol::WAIT_SIGNALS.join(",")
+                ));
+            }
             req["until"] = json!(list);
         }
     }

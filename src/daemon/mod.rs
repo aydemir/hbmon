@@ -5,4 +5,5 @@ pub mod signals;
 // public path flat (daemon::run_daemon), so allow the inception lint.
 #[allow(clippy::module_inception)]
 pub mod daemon;
+pub(crate) mod handler;
 pub use daemon::{run_daemon, spawn_watch, MonitorConfig};

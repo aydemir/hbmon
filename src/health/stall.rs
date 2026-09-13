@@ -3,11 +3,18 @@
 //! stall if current_idle > 3*p95 AND idle > 30s.
 //! Short builds (<10s) never stall.
 
+use std::collections::VecDeque;
 use std::time::Instant;
+
+/// Sessiz aralık örneklerinin kayan penceresi (en fazla 120).
+const WINDOW: usize = 120;
+/// Örnek yokken tarafsız önsel (soğuk başlangıçta eşik 30s olur).
+const NEUTRAL_P95: f32 = 5.0;
 
 pub struct StallDetector {
     start: Instant,
-    silent_samples: Vec<f32>,
+    silent_samples: VecDeque<f32>,
+    p95_cache: f32,
     current_idle: f32,
     in_stall: bool,
 }
@@ -16,7 +23,8 @@ impl StallDetector {
     pub fn new() -> Self {
         Self {
             start: Instant::now(),
-            silent_samples: vec![],
+            silent_samples: VecDeque::new(),
+            p95_cache: NEUTRAL_P95,
             current_idle: 0.0,
             in_stall: false,
         }
@@ -28,13 +36,14 @@ impl StallDetector {
         if active {
             if self.elapsed() >= 1.0 && self.current_idle >= 1.0 {
                 // record silent gap (warmup only, first 60s builds the baseline;
-                // after that keep rolling window of last 120 samples)
-                if self.elapsed() <= 60.0 || self.silent_samples.len() < 120 {
-                    self.silent_samples.push(self.current_idle);
+                // after that keep rolling window of last WINDOW samples)
+                if self.elapsed() <= 60.0 || self.silent_samples.len() < WINDOW {
+                    self.silent_samples.push_back(self.current_idle);
                 } else {
-                    self.silent_samples.remove(0);
-                    self.silent_samples.push(self.current_idle);
+                    self.silent_samples.pop_front();
+                    self.silent_samples.push_back(self.current_idle);
                 }
+                self.p95_cache = Self::p95_of(&self.silent_samples);
             }
             let was = self.in_stall;
             self.current_idle = 0.0;
@@ -55,13 +64,17 @@ impl StallDetector {
         self.start.elapsed().as_secs_f32()
     }
 
-    fn p95(&self) -> f32 {
-        if self.silent_samples.is_empty() {
-            return 5.0; // neutral prior
+    fn p95_of(samples: &VecDeque<f32>) -> f32 {
+        if samples.is_empty() {
+            return NEUTRAL_P95; // neutral prior
         }
-        let mut v = self.silent_samples.clone();
+        let mut v: Vec<f32> = samples.iter().copied().collect();
         v.sort_by(|a, b| a.partial_cmp(b).unwrap());
         v[((v.len() as f32 * 0.95) as usize).min(v.len() - 1)]
+    }
+
+    fn p95(&self) -> f32 {
+        self.p95_cache
     }
 
     pub fn threshold(&self) -> f32 {
@@ -108,7 +121,8 @@ mod tests {
     fn aged(secs: u64) -> StallDetector {
         StallDetector {
             start: Instant::now() - Duration::from_secs(secs),
-            silent_samples: vec![],
+            silent_samples: VecDeque::new(),
+            p95_cache: NEUTRAL_P95,
             current_idle: 0.0,
             in_stall: false,
         }
@@ -156,5 +170,18 @@ mod tests {
         assert_eq!(s.idle(), 5.0);
         s.tick(true, 0.5);
         assert_eq!(s.idle(), 0.0);
+    }
+
+    #[test]
+    fn rolling_window_caps_length_and_tracks_p95() {
+        let mut s = aged(61);
+        for _ in 0..130 {
+            s.tick(false, 2.0);
+            s.tick(true, 0.5);
+        }
+        assert_eq!(s.silent_samples.len(), 120);
+        // all samples are 2.0 → p95 tracks the pushed value, threshold stays 30s floor
+        assert_eq!(s.p95_idle(), 2.0);
+        assert_eq!(s.threshold(), 30.0);
     }
 }

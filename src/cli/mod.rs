@@ -1,5 +1,6 @@
 pub mod exec;
 pub mod kill;
+pub mod list;
 pub mod shutdown;
 pub mod status;
 pub mod wait;
@@ -32,6 +33,8 @@ pub enum Commands {
     Kill(kill::KillArgs),
     /// Shut the daemon down
     Shutdown(shutdown::ShutdownArgs),
+    /// List known monitors (read-only discovery)
+    List(list::ListArgs),
     /// Remove stale pid/sock files
     Cleanup(CleanupArgs),
 }
@@ -51,6 +54,7 @@ pub fn dispatch(cli: Cli) -> Result<i32, String> {
         Commands::Exec(a) => exec::run(a),
         Commands::Kill(a) => kill::run(a),
         Commands::Shutdown(a) => shutdown::run(a),
+        Commands::List(a) => list::run(a),
         Commands::Cleanup(a) => run_cleanup(a),
     }
 }

@@ -42,3 +42,14 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
 - Karar: `wait --until` — bloklanan çağrının izlenen sinyalde erken
   dönüşü. Polling (`status`/`log_tail`) korunur, `until` yoksa davranış
   değişmez. Dürüst adıyla senkron çoğullamalı bekleme.
+
+## 2026-09-10 — Wrapper-push tezi çürütüldü (TASK-013)
+
+- Öneri: `hbmon` yerine geçen tokio+reqwest wrapper, her stdout/stderr
+  satırını `error/fail/event/state` contains ile `localhost:3000`'e POST'lasın.
+- Canlı deney (uuid=bd8e75b3): 5 satır `.out` → wrapper 4 POST (2'si gürültü:
+  `state update tick`, `event fired`); 4 olay `.jsonl` → sidecar 2 PUSH
+  (`dep_missing`, `exit`). `wait --until` `woke_on=dep_missing`, `code=2`.
+- Hüküm: satır-bazı wrapper-push bol keseden; kilit (tek binary, sıfır
+  runtime bağımlılık, pull-tabanlı, context ekonomisi) korunur. Push şartsa
+  core'a dokunmayan JSONL-tail sidecar, olay-bazı filtreyle yapılır.

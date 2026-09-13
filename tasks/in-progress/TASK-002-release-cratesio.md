@@ -2,10 +2,9 @@
 id: TASK-002
 title: "Release + crates.io yayını"
 status: in_progress
-blocked_on: crates.io token (kullanıcıda)
 priority: P1
 created: 2026-09-09
-updated: 2026-09-09
+updated: 2026-09-13
 environment: both
 labels: [release, distribution]
 depends_on: []
@@ -21,7 +20,8 @@ boyutunu ölçmek (<5MB hedefi doğrulanacak).
 ## Kapsam
 
 - `cargo build --release`, boyut ölçümü, README'ye kurulum satırı
-- `cargo publish --dry-run`, sonra gerçek yayın (kullanıcı: henüz erken — bekliyor)
+- `cargo publish --dry-run`, sonra gerçek yayın (kullanıcı: henüz erken — bekliyor;
+  2026-09-13: token alındı, `cargo login` ile saklandı — yayın adımı hazır, komut bekleniyor)
 - GitHub prebuilt: `release.yml` eklendi (tag `v*` veya manuel → 4 platform
   asset'i + sha256; ilk tag crates.io ile aynı gün kesilecek)
 - Yapılmayacaklar: Homebrew/Nix (talep gelirse ayrı task)
@@ -35,3 +35,11 @@ boyutunu ölçmek (<5MB hedefi doğrulanacak).
 ## Etkilenen Dosyalar
 
 - `Cargo.toml`, `README.md`
+
+## Hazırlık Notu (TASK-020, 2026-09-13 — token bekleniyor)
+
+- `cargo build --locked --release`: 33s, ikilik **2.38 MB** (<5MB hedef ✓, README'deki ~2.4MB doğrulandı)
+- Duman testi (release ikilik): watch → status --compact → wait(done, code 0) → wait --until bogus (exit 3 INVALID_UNTIL) ✓
+- `cargo publish --dry-run --allow-dirty`: 92 dosya paketlendi, verify temiz, upload yapılmadı ✓
+- Metadata (description/license/repository) paketlemede sorunsuz
+- Token gelince tek adım kalır: `cargo publish` + `v*` tag (release.yml manuel de tetiklenebilir)

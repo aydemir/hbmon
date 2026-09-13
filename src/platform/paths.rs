@@ -73,17 +73,30 @@ fn from_explicit_windows(p: PathBuf) -> String {
     }
 }
 
-/// `hbmon-<uuid>.sock` / `hbmon-<uuid>` kalıbından uuid'yi çeker.
-#[cfg(windows)]
-fn stem_uuid(s: &str) -> Option<String> {
-    let base = s.replace('\\', "/").rsplit('/').next()?.to_string();
+/// `hbmon-<uuid>` eser adından uuid'yi çeker (.sock/.jsonl/.pid/.out).
+/// Her platformda aynı (TASK-017 `list` taraması için ortak yardımcı).
+/// Üretilen uuid'ler hex olduğundan sonek çakışması olmaz.
+pub fn uuid_from_base(base: &str) -> Option<String> {
+    let base = base.rsplit('/').next().unwrap_or(base);
+    let base = base.rsplit('\\').next().unwrap_or(base);
     let base = base.strip_prefix("hbmon-")?;
-    let base = base.strip_suffix(".sock").unwrap_or(base);
+    let base = base
+        .strip_suffix(".sock")
+        .or_else(|| base.strip_suffix(".jsonl"))
+        .or_else(|| base.strip_suffix(".pid"))
+        .or_else(|| base.strip_suffix(".out"))
+        .unwrap_or(base);
     if base.is_empty() {
         None
     } else {
         Some(base.to_string())
     }
+}
+
+/// `hbmon-<uuid>.sock` / `hbmon-<uuid>` kalıbından uuid'yi çeker.
+#[cfg(windows)]
+fn stem_uuid(s: &str) -> Option<String> {
+    uuid_from_base(s)
 }
 
 /// Varsayılan transport adresi (uuid yoksa üretilmez — caller üretir).

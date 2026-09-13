@@ -333,6 +333,10 @@ tail -n 20 /tmp/hbmon-abc.jsonl
 
 **Response:** (tam şema Section 8'de.)
 
+Compact (poll dostu, opt-in): `{"v":1,"op":"status","id":"req-1","compact":true}`
+→ `state,uuid,elapsed_sec,health{stall_score,threshold_sec},last_event`
+(+bitmişse `code`); `tree/metrics-detay/log_tail/root_cmd` yok.
+
 ##### Operation: `metrics` (Hafif)
 
 Sadece anlık metrikleri döner (tree yok, hızlı):
@@ -370,9 +374,12 @@ Build bitene kadar bloklanır. LLM'in "şimdi sorma, hazır olunca söyle" demes
 - Build erken biterse hemen döner
 - 500ms poll aralığı ile süreç ağacı kontrol edilir
 
-**Erken dönüş (`until`):** `until` listesi verilirse (`done`, `dep_missing`,
-`stall_suspect`, `oom_suspect`, …) çağrı ilk eşleşen sinyalde `woke_on`
-alanıyla döner; polling ve harness eklentisi gerekmez. Bu senkron
+**Erken dönüş (`until`):** `until` listesi verilirse (kanonik: `done`,
+`failed`, `dep_missing`, `timeout`, `stall_suspect`, `oom_suspect`; alyas:
+`stalled`=stall_suspect, `oom_killed`=oom_suspect) çağrı ilk eşleşen sinyalde
+`woke_on`
+alanıyla döner; polling ve harness eklentisi gerekmez. Bilinmeyen sinyal adı
+`INVALID_UNTIL` hatası verir (sessiz yoksayma yok). Bu senkron
 çoğullamalı beklemedir, async push değil (`until` yoksa yalnızca terminal
 state'lerde dönülür).
 

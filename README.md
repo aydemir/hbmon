@@ -18,7 +18,7 @@ cgroup politikası HBMon'un kontrol alanı dışındadır (detay `HBMON-RFC.md` 
 
 ```bash
 cargo install --git https://github.com/aydemir/hbmon
-# veya kaynaktan: cargo build --release  # strip'li ikilik ~2.4MB
+# veya kaynaktan: cargo build --release  # strip'li ikilik 2.38MB (v0.1.0, <5MB hedefi; CI `size` job'u izler)
 # Windows: aynısı → target\release\hbmon.exe (named pipe transport)
 ```
 

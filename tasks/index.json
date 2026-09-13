@@ -26,7 +26,7 @@
     ],
     "depends_on": [],
     "created": "2026-09-09",
-    "updated": "2026-09-09",
+    "updated": "2026-09-13",
     "file": "tasks/in-progress/TASK-002-release-cratesio.md"
   },
   {
@@ -188,5 +188,120 @@
     "created": "2026-09-10",
     "updated": "2026-09-10",
     "file": "tasks/done/TASK-012-test-uuid-flake.md"
+  },
+  {
+    "id": "TASK-013",
+    "title": "Pull vs wrapper-push canlı deney + sidecar",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": [
+      "experiment",
+      "sidecar",
+      "pull",
+      "validation"
+    ],
+    "depends_on": [
+      "TASK-005"
+    ],
+    "created": "2026-09-10",
+    "updated": "2026-09-10",
+    "file": "tasks/done/TASK-013-pull-sidecar-deney.md"
+  },
+  {
+    "id": "TASK-014",
+    "title": "daemon dispatch split",
+    "status": "done",
+    "priority": "P3",
+    "environment": "both",
+    "labels": ["daemon", "refactor", "readability"],
+    "depends_on": ["TASK-011"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-014-daemon-dispatch-split.md"
+  },
+  {
+    "id": "TASK-015",
+    "title": "wait --until sinyal normalizasyonu",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["ipc", "wait", "protocol"],
+    "depends_on": ["TASK-005"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-015-wait-until-normalize.md"
+  },
+  {
+    "id": "TASK-016",
+    "title": "status context ekonomisi (compact)",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["ipc", "status", "context-economy"],
+    "depends_on": [],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-016-status-compact.md"
+  },
+  {
+    "id": "TASK-017",
+    "title": "sock keşif + gc (list/prune)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["cli", "operability", "discovery"],
+    "depends_on": [],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-017-sock-gc-list.md"
+  },
+  {
+    "id": "TASK-018",
+    "title": "health sağlamlık (oom+stall)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["daemon", "health", "perf"],
+    "depends_on": [],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-018-health-robustness.md"
+  },
+  {
+    "id": "TASK-019",
+    "title": "drift kilidi + boyut kapısı",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["docs", "deps", "rfc", "ci"],
+    "depends_on": ["TASK-008"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-019-drift-size-gates.md"
+  },
+  {
+    "id": "TASK-020",
+    "title": "release unblock hazırlığı",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["release", "distribution"],
+    "depends_on": ["TASK-002"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-020-release-prep.md"
+  },
+  {
+    "id": "TASK-021",
+    "title": "dep-offset yarışı",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["daemon", "dep-missing", "flake", "race"],
+    "depends_on": ["TASK-009"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-021-dep-offset-race.md"
   }
 ]
