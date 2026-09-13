@@ -14,7 +14,19 @@ Three-layer separation: **lifecycle** (setsid + double-fork → reparent to init
 **communication** (sidecar JSONL + pull-based queries over UDS, no log leaks into context),
 **discovery** (env var + `/tmp/hbmon-*.sock` convention). Limitation: setsid
 escapes the session/process-group but not the cgroup; host/harness cgroup
-policy is outside HBMon's control (see `HBMON-RFC.md` §4.2.1 — in Turkish).
+policy is outside HBMon's control (see [HBMON-RFC-EN.md](HBMON-RFC-EN.md) §4.2.1; Turkish original: [HBMON-RFC.md](HBMON-RFC.md)).
+
+## Platform support
+
+| Area | Linux | macOS | Windows |
+|---|---|---|---|
+| supervision | setsid + double-fork | setsid + double-fork | DETACHED_PROCESS + Job Object |
+| CPU / RSS / IO / FD | full via `/proc` | CPU best-effort; RSS/FD/path via libproc | CPU/RSS/IO/handles via Toolhelp |
+| network | TCP count via `/proc` | — | best-effort |
+| cmdline | full | full | exe path only |
+| OOM suspicion | dmesg | best-effort (dmesg format differs) | none (documented gap) |
+| transport | UDS, files `0600` | UDS, files `0600` | named pipe (no ACL lockdown) |
+| stall / dep-missing / timeout | yes (heuristic) | yes (heuristic) | yes (heuristic) |
 
 ## Install
 
@@ -49,8 +61,9 @@ hbmon shutdown --sock ...
 
 ## For agents (automation fast path)
 
-This section is for LLM agents; the full contract is in `HBMON-RFC.md`
-(in Turkish) — don't skip it.
+This section is for LLM agents; the full contract is in [HBMON-RFC-EN.md](HBMON-RFC-EN.md)
+(Turkish original: [HBMON-RFC.md](HBMON-RFC.md)) — don't skip it. One-page English protocol summary:
+[PROTOCOL.md](PROTOCOL.md).
 
 1. `hbmon watch --detach -- <cmd>` → stdout line 1 = handshake JSON
    `{v,ev:"ready",uuid,sock,log}`. Parse line 1, keep `sock`.
@@ -65,10 +78,33 @@ This section is for LLM agents; the full contract is in `HBMON-RFC.md`
    see all: `hbmon list` (read-only; `--state running` / `--live-only` filter).
    For events: `hbmon log --sock $SOCK --tail N` (don't cat the whole `.jsonl`;
    `--event metric` returns only matching events).
+   Stale files: a crashed daemon leaves `.sock/.pid/.jsonl/.out` behind.
+   `hbmon cleanup` removes files older than `--older-than` (default 86400s)
+   but never touches a live daemon's siblings. If `status` fails with a
+   connect error, the socket is stale — `watch` again, don't reuse it.
+6. Suspect signals are heuristics, not proof — act, don't just wait:
+   | signal | meaning | recommended action |
+   |---|---|---|
+   | `stall_suspect` / `stalled` | no IO/CPU/child-spawn past threshold | `status --compact` + `log --event metric` to confirm; `kill` if truly stuck, else keep waiting |
+   | `oom_suspect` / `oom_killed` | OOM-killer trace matched | don't retry as-is — reduce memory usage, then retry |
+   | `dep_missing` | missing-dependency pattern (exit 2) | install the package + retry |
+
+## Stability & SemVer
+
+`0.x`: no breaking change to the frozen surface without a minor bump and a
+`decisions.md` entry. Frozen: handshake JSON (`v`, `ev:"ready"`, `uuid`,
+`sock`, `log`; `exec` adds `ephemeral:true`), exit-code mapping (0 done /
+1 failed / 2 dep-missing / 124 timeout / 137 oom / 3 internal error),
+`wait --until` canonical names (`done failed dep_missing timeout
+stall_suspect oom_suspect`, aliases `stalled oom_killed`),
+`status --compact` field set, IPC ops (`status metrics log_tail wait kill
+shutdown`). Experimental (may change): metric fields, stall
+thresholds/scores, `metrics`/`log_tail` output details. Locked by
+`tests/drift.rs`.
 
 ## Status
 
 v1 MVP: daemon, UDS JSON-RPC (`status`/`metrics`/`wait`/`kill`/`log_tail`/`shutdown`),
 JSONL event log, adaptive stall detection, OOM suspicion (dmesg), dependency-missing
-pattern matching, timeout watchdog. Full design in `HBMON-RFC.md` (separate document,
-in Turkish).
+pattern matching, timeout watchdog. Full design in [HBMON-RFC-EN.md](HBMON-RFC-EN.md) (separate document;
+Turkish original: [HBMON-RFC.md](HBMON-RFC.md)).

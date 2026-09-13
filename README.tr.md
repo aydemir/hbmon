@@ -14,7 +14,19 @@ izleme (Toolhelp+RSS/IO/handle; net best-effort, cmdline = exe yolu).
 **iletişim** (sidecar JSONL + UDS üzerinden çekme-tabanlı sorgu, context'e log sızmaz),
 **keşif** (env var + `/tmp/hbmon-*.sock` convention). Sınır: setsid
 session/process-group'dan çıkarır ama cgroup'tan çıkarmaz; host/harness
-cgroup politikası HBMon'un kontrol alanı dışındadır (detay `HBMON-RFC.md` §4.2.1).
+cgroup politikası HBMon'un kontrol alanı dışındadır (detay [HBMON-RFC.md](./HBMON-RFC.md) §4.2.1).
+
+## Platform desteği
+
+| Alan | Linux | macOS | Windows |
+|---|---|---|---|
+| gözetim | setsid + double-fork | setsid + double-fork | DETACHED_PROCESS + Job Object |
+| CPU / RSS / IO / FD | `/proc` ile tam | CPU best-effort; RSS/FD/yol libproc ile | Toolhelp ile CPU/RSS/IO/handle |
+| ağ | `/proc` ile TCP sayımı | — | best-effort |
+| cmdline | tam | tam | yalnızca exe yolu |
+| OOM şüphesi | dmesg | best-effort (dmesg formatı farklı) | yok (belgeli eksik) |
+| transport | UDS, dosyalar `0600` | UDS, dosyalar `0600` | named pipe (ACL kilidi yok) |
+| stall / dep-missing / timeout | evet (heuristic) | evet (heuristic) | evet (heuristic) |
 
 ## Kurulum
 
@@ -49,7 +61,8 @@ hbmon shutdown --sock ...
 
 ## Ajanlar için (otomat hızlı yolu)
 
-Bu bölüm LLM ajanları içindir; detaylı sözleşme `HBMON-RFC.md`'dedir, orayı ıskalamayın.
+Bu bölüm LLM ajanları içindir; detaylı sözleşme [HBMON-RFC.md](./HBMON-RFC.md)'dedir, orayı ıskalamayın.
+Tek sayfalık İngilizce protokol özeti: [PROTOCOL.md](PROTOCOL.md).
 
 1. `hbmon watch --detach -- <cmd>` → stdout satır 1 = handshake JSON
    `{v,ev:"ready",uuid,sock,log}`. Satır 1'i parse et, `sock`'u sakla.
@@ -64,9 +77,33 @@ Bu bölüm LLM ajanları içindir; detaylı sözleşme `HBMON-RFC.md`'dedir, ora
    hepsini gör: `hbmon list` (salt-okunur; `--state running` / `--live-only` filtreler).
    Olaylar için `hbmon log --sock $SOCK --tail N` (tüm `.jsonl`'u cat'leme;
    `--event metric` yalnızca eşleşen olayları döndürür).
+   Bayat dosyalar: çöken daemon `.sock/.pid/.jsonl/.out` bırakır.
+   `hbmon cleanup`, `--older-than`'den eski dosyaları siler (varsayılan
+   86400s) ama canlı daemon'un kardeş dosyalarına dokunmaz. `status`
+   bağlantı hatası verirse socket bayattır — yeniden `watch` aç, eskisini
+   kullanma.
+6. Şüphe sinyalleri heuristic'tir, kanıt değil — bekleme, aksiyon al:
+   | sinyal | anlamı | önerilen aksiyon |
+   |---|---|---|
+   | `stall_suspect` / `stalled` | eşik aşımında IO/CPU/child-spawn yok | `status --compact` + `log --event metric` ile teyit; gerçekten takıldıysa `kill`, yoksa beklemeye devam |
+   | `oom_suspect` / `oom_killed` | OOM-killer izi eşleşti | aynen retry yapma — bellek kullanımını azalt, sonra retry |
+   | `dep_missing` | eksik-bağımlılık deseni (exit 2) | paketi kur + retry |
+
+## Kararlılık & SemVer
+
+`0.x`: dondurulmuş yüzeye minor artışı ve `decisions.md` girdisi olmadan
+breaking change yok. Dondurulmuş: handshake JSON (`v`, `ev:"ready"`,
+`uuid`, `sock`, `log`; `exec` ek olarak `ephemeral:true`), exit-code
+eşlemesi (0 done / 1 failed / 2 dep-missing / 124 timeout / 137 oom /
+3 iç hata), `wait --until` kanonik adları (`done failed dep_missing
+timeout stall_suspect oom_suspect`, alyaslar `stalled oom_killed`),
+`status --compact` alan seti, IPC op'ları (`status metrics log_tail wait
+kill shutdown`). Deneysel (değişebilir): metrik alanları, stall
+eşikleri/skorları, `metrics`/`log_tail` çıktı detayları. Kilit:
+`tests/drift.rs`.
 
 ## Durum
 
 v1 MVP: daemon, UDS JSON-RPC (`status`/`metrics`/`wait`/`kill`/`log_tail`/`shutdown`),
 JSONL olay günlüğü, adaptif stall tespiti, OOM şüphesi (dmesg), dependency-missing
-desen eşleme, timeout watchdog. Tasarımın tamamı için `HBMON-RFC.md` (ayrı doküman).
+desen eşleme, timeout watchdog. Tasarımın tamamı için [HBMON-RFC.md](./HBMON-RFC.md) (ayrı doküman).

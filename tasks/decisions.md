@@ -53,3 +53,23 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
 - Hüküm: satır-bazı wrapper-push bol keseden; kilit (tek binary, sıfır
   runtime bağımlılık, pull-tabanlı, context ekonomisi) korunur. Push şartsa
   core'a dokunmayan JSONL-tail sidecar, olay-bazı filtreyle yapılır.
+
+## 2026-09-13 — crates.io durumu + sonraki tag (TASK-033)
+
+- `cargo publish --dry-run` temiz (67 dosya, verify+compile OK).
+- `hbmon@0.1.1` crates.io'da zaten yayında — aynı numaraya yeniden
+  publish yok (registry değişmezliği).
+- Sonraki tag: `v0.1.2` (README Stability/matrix/suspect + PROTOCOL.md
+  non-breaking doküman ekleri). Breaking olursa minor + bu dosyaya girdi.
+- `cargo publish` otomatik release'e bağlanmadı: geri alınamaz işlemde
+  insan kapısı şart. Prosedür `docs/RELEASE.md`'de, manuel tetik
+  `.github/workflows/publish-crate.yml`'de (`CRATES_IO_TOKEN`).
+- README install satırı doğrulandı (`cargo install hbmon`) — `--git`
+  karışıklığı iddiası asılsız, değişiklik yok.
+
+## 2026-09-13 — RFC İngilizce eşdeğeri (TASK-035)
+
+- `HBMON-RFC-EN.md`: `HBMON-RFC.md`'nin birebir çevirisi (73 başlık,
+  68 ``` çiti, kod blokları bayt-ayni). Çelişmede Türkçe asıl normatiftir.
+- `README.md` (EN) linkleri EN belgeye çevrildi; `README.tr.md` Türkçe
+  belgede kaldı. Frozen terimler çevrilmedi (op/state adları, exit kodları).

@@ -423,5 +423,53 @@
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-031-rfc-refresh.md"
+  },
+  {
+    "id": "TASK-032",
+    "title": "Tag öncesi sözleşme dokümanı (Stability + matrix + suspect)",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["docs", "contract", "agents"],
+    "depends_on": ["TASK-028", "TASK-031"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-032-stability-matrix.md"
+  },
+  {
+    "id": "TASK-033",
+    "title": "crates.io publish prosedürü + release.yml publish",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": ["release", "distribution"],
+    "depends_on": ["TASK-002", "TASK-030"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-033-crates-publish.md"
+  },
+  {
+    "id": "TASK-034",
+    "title": "Gerçek build smoke testi + stale/orphan politika dokümanı",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["tests", "operability", "docs"],
+    "depends_on": ["TASK-022"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-034-smoke-stale-policy.md"
+  },
+  {
+    "id": "TASK-035",
+    "title": "HBMON-RFC İngilizce çevirisi (HBMON-RFC-EN.md)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["docs", "rfc", "i18n"],
+    "depends_on": ["TASK-031", "TASK-032"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-035-rfc-english-translation.md"
   }
 ]

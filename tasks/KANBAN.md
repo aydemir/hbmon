@@ -45,3 +45,7 @@
 | TASK-029 | log --event + list --state filtresi | done | P2 |
 | TASK-030 | Crate hijyeni + EN vitrin (v0.1.1) | done | P2 |
 | TASK-031 | HBMON-RFC bayatlık temizliği (Node portu + v0.1.1 senkronu) | done | P2 |
+| TASK-032 | Tag öncesi sözleşme dokümanı (Stability + matrix + suspect) | done | P1 |
+| TASK-033 | crates.io publish prosedürü + release.yml publish | done | P1 |
+| TASK-034 | Gerçek build smoke testi + stale/orphan politika dokümanı | done | P2 |
+| TASK-035 | HBMON-RFC İngilizce çevirisi (HBMON-RFC-EN.md) | done | P2 |
