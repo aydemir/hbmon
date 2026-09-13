@@ -3,14 +3,14 @@
 
 | Alan | Değer |
 |---|---|
-| **Durum** | Draft |
-| **Tarih** | 2026-09-09 |
+| **Durum** | v0.1.1 ile senkron (taslak dönemi kapandı) |
+| **Tarih** | 2026-09-09 (ilk taslak) — son senkron 2026-09-13 |
 | **Yazar** | (kullanıcı) — orijinal mimari tasarım; Rust implementasyon planı Mavis tarafından |
 | **Hedef kitle** | LLM harness geliştiricileri, build-orchestration yazanlar, derleme süresi yüksek projelerde ajan kullananlar |
-| **Referans** | `aydemir/opencode-plugins` — DHS PTC + `build-mon.sh` + `opencode-settle-noticer` (varlık kanıtı) |
+| **Referans** | `aydemir/opencode-plugins` — DHS PTC + `build-mon.mjs` (+ `hbmon-build-mon.mjs` adapter) + `opencode-settle-noticer` (varlık kanıtı; `.sh` öncüller `scripts/archive/`'da) |
 | **Dil** | Rust (stable, edition 2021) |
-| **Hedef OS (v1)** | Linux + macOS |
-| **Hedef OS (v2)** | Windows (named pipe) |
+| **Hedef OS (v1)** | Linux + macOS — gerçekleşti; Windows TASK-006 ile v0.1.0'a çekildi |
+| **Hedef OS (v2)** | (kapanan hedef — Windows erken geldi) |
 | **Lisans** | MIT OR Apache-2.0 |
 
 ---
@@ -44,7 +44,7 @@ Bu RFC, **üç katmanlı ayrıştırma** (süreç yaşam döngüsü, iletişim, 
 
 **Ana katkı:** LLM'in build sürecini **pasif izleme + çekme (pull) tabanlı sorgu** ile yönetebilmesi için sıfır-harness-bağımlılık sözleşmesi. Mevcut harness'ların (OpenCode, Claude Code, Aider, Cursor BG, Codex CLI, raw shell) hiçbir değişiklik olmadan HBMon'u kullanabilmesi.
 
-**Referans varlık kanıtı:** `aydemir/opencode-plugins` reposundaki `build-mon.sh` + `opencode-settle-noticer` kombinasyonu bu felsefenin plugin/shim seviyesinde çalışan ispatlanmış halidir. Bu RFC, onu OS-bağımsız, harness-bağımsız, first-class bir Rust aracına yükseltir.
+**Referans varlık kanıtı:** `aydemir/opencode-plugins` reposundaki `build-mon.mjs` (+ hbmon motorlu `hbmon-build-mon.mjs` adapter) + `opencode-settle-noticer` kombinasyonu bu felsefenin plugin/shim seviyesinde çalışan ispatlanmış halidir (`.sh` öncüller multios-path sorunları yüzünden Node'a portlandı — opencode-plugins TASK-127 — ve `scripts/archive/`'a kaldırıldı). Bu RFC, onu OS-bağımsız, harness-bağımsız, first-class bir Rust aracına yükseltir.
 
 ---
 
@@ -81,7 +81,7 @@ Tipik sonuçlar:
 
 Gerçek deneyimlerden çıkarılan bulgular:
 
-1. **`build-mon.sh` + `opencode-settle-noticer` kombinasyonu gerçek fayda sağlıyor.** Arka planda derleme olurken LLM boşa düşmüyor, başka işle meşgul olabiliyor.
+1. **`build-mon.mjs` + `opencode-settle-noticer` kombinasyonu gerçek fayda sağlıyor.** Arka planda derleme olurken LLM boşa düşmüyor, başka işle meşgul olabiliyor. (Tarihçe: öncül `build-mon.sh`'di; multios path sorunları Node portunu zorunlu kıldı — `scripts/archive/`'a bakın.)
 2. **DHS PTC (context-saver) pattern'i çalışıyor.** Build çıktısı context'e sızmıyor; olay bitince özet push'lanıyor.
 3. **Plugin/shim seviyesi, build monitoring için maksimumu veriyor — ama mimari minimumun biraz üstünde.** Asıl doğru yer harness core'unda first-class subsystem.
 4. **Pratik kısıt:** Harness core'una PR bütçesi yok → plugin/shim seviyesinde kalmak bilinçli tercih.
@@ -92,7 +92,7 @@ Gerçek deneyimlerden çıkarılan bulgular:
 
 ### 2.4 Hedef-Dışı (Out of Scope, v1)
 
-- v1'de Windows desteği yok (v2'ye)
+- ~~v1'de Windows desteği yok (v2'ye)~~ → gerçekleşti: Windows TASK-006 ile v0.1.0'da (named pipe transport + Win32 inspector + Job-Object detach/kill)
 - v1'de container-aware cgroup v2 ayrımı yok (v1.5)
 - v1'de multi-build paralel izleme yok (v2)
 - v1'de TUI/Web UI yok (v2)
@@ -397,6 +397,10 @@ state'lerde dönülür).
 → {"v":1,"id":"req-5","ok":true,"lines":["...","..."]}
 ```
 
+Opsiyonel server-side filtre (TASK-029, geriye uyumlu): `"event":"metric"`
+verilirse yalnızca `ev` tam-eşleşen satırların son N'i döner
+(`hbmon log --sock … --tail 20 --event metric`).
+
 ##### Operation: `shutdown`
 
 Daemon'ı kapatır (build devam etmez):
@@ -500,6 +504,10 @@ hbmon exec -- make -j8
 Sonra build çıktısı gelir.
 
 **LLM parse eder:** İlk satır handshake, kalanı build output. (LLM zaten `head -n 1` + kalan olarak ayırabilir.)
+
+> Not (v1 gerçekleşmesi, TASK-007): `exec` ephemeral'dır — handshake'teki
+> `sock`/`log` rezerve addır, dosya oluşmaz; `status`/`wait` denenmez.
+> Handshake `"ephemeral":true` + `"note"` taşır.
 
 ### 6.2 Hangisi Tercih Edilmeli?
 
@@ -682,18 +690,18 @@ oom-kill:constraint=CONSTRAINT_MEMCG,...
 
 | Event | Tetikleyici | Ek Alanlar |
 |---|---|---|
-| `ready` | Daemon handshake | `sock`, `log`, `root_pid`, `cmd` |
-| `spawn` | Root süreç başladı | `pid`, `cmd`, `ppid` |
-| `child_spawn` | Yeni child | `pid`, `ppid`, `cmd` |
-| `child_exit` | Child bitti | `pid`, `code`, `duration_sec` |
+| `ready` | Daemon handshake (stdout satır 1; `.jsonl`'a yazılmaz) | `sock`, `log`, `root_pid`, `cmd` |
+| `spawn` | (şemada; v0.1.1'de emit edilmiyor) | `pid`, `cmd`, `ppid` |
+| `child_spawn` | (şemada; v0.1.1'de emit edilmiyor — izdüşümü `health.last_child_spawn_at`) | `pid`, `ppid`, `cmd` |
+| `child_exit` | (şemada; v0.1.1'de emit edilmiyor) | `pid`, `code`, `duration_sec` |
 | `exit` | Root bitti | `pid`, `code`, `duration_sec`, `state` |
 | `metric` | Periyodik ölçüm | `cpu`, `rss_mb`, `io_r`, `io_w`, `fds` |
 | `stall_suspect` | Stall heuristic tetiklendi | `reason`, `idle_sec`, `threshold_sec` |
 | `stall_resolved` | Stall sona erdi | `lasted_sec` |
 | `oom_suspect` | OOM killer | `pid`, `killed_by` |
 | `dep_missing` | Pattern match | `pattern_id`, `category`, `match_text` |
-| `signal` | Sürece signal gönderildi | `pid`, `sig` |
-| `health_change` | State transition | `from`, `to` |
+| `signal` | (şemada; v0.1.1'de emit edilmiyor) | `pid`, `sig` |
+| `health_change` | (şemada; v0.1.1'de emit edilmiyor — izdüşümü `status.state`) | `from`, `to` |
 | `timeout` | Timeout aşıldı | `elapsed_sec`, `limit_sec` |
 | `shutdown` | Daemon kapanıyor | `reason` |
 
@@ -826,14 +834,19 @@ LLM periyodik `log_tail` ile `dep_missing` olayını görürse derleme bitmeden 
 ls -t /tmp/hbmon-*.sock | head -2
 ```
 
-### 11.5 Senaryo 5 — `build-mon.sh` Migrasyonu
+### 11.5 Senaryo 5 — `build-mon` Migrasyonu (tarihçe: `.sh` → `.mjs`)
 
-| `build-mon.sh` | `hbmon` |
+| `build-mon.sh` (arşivde) / `build-mon.mjs` (güncel) | `hbmon` |
 |---|---|
 | `pgrep -P $PID` polling | `hbmon wait` (bloklamalı) |
 | Custom event parsing | `hbmon status --format json` |
-| OS-specific (pgrep, ps) | Cross-OS trait |
+| OS-specific (pgrep, ps) / Node çoklu-OS | Cross-OS trait |
 | Stall/OOM/dep-missing yok | Hepsi dahil |
+
+Not: opencode-plugins tarafı multios-path sorunları yüzünden Node'a
+portlandı (TASK-127); `.sh` öncüller `scripts/archive/`'da durur.
+`hbmon-build-mon.mjs` adapter'ı build-mon sözleşmesini hbmon motoruyla
+gerçekler (hbmon tarafı TASK-004).
 
 ---
 
@@ -852,7 +865,9 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 
 - **Dosya izinleri:** pid/sock/jsonl/out hepsi `0600` (Windows: ACL
   varsayılanı + `%TEMP%`; pipe `\\.\pipe\hbmon-<uuid>`); symlink açılışta reddedilir (`O_EXCL` + sahiplik kontrolü).
-- **Path injection:** `..` içeren path'ler reddedilir.
+- **Path injection:** `..` içeren path'ler reddedilir; `--uuid` ayrıca
+  charset kilitlidir (`1..=64` char, `[A-Za-z0-9_-]` — TASK-027; üretim
+  uuid'si 16 hex char / 64-bit).
 - **Resource limit:** daemon ~10MB RAM, idle <%1 CPU hedefi.
 - **Çift spawn:** canlı socket varsa `MONITOR_ALREADY_EXISTS`.
 - **Zombie:** daemon exit sonrası 60s linger (wait/status için), sonra pid/sock temizliği; JSONL + .out kalır. `hbmon cleanup` ile eski dosyalar silinir.
@@ -869,8 +884,10 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 - [x] Daemonization, UDS JSON-RPC, JSONL, exit mapping
 - [x] Stall/OOM/dep-missing/timeout (ETA gelecek — v1'de `eta_sec` dönülmüyor)
 - [x] CLI: watch, status, wait, exec, kill, shutdown, cleanup, list, log
-  (+`status --compact`, `wait --until` sözlüğü, `cleanup --dir`, `watch --max-log-mb`)
-- [x] 41 unit + 7 integration test (2026-09-09, `cargo test --locked -j2` yeşil)
+  (+`status --compact`, `wait --until` sözlüğü, `cleanup --dir`, `watch --max-log-mb`,
+  `log --event`, `list --state`/`--live-only` — TASK-005/016/017/023/024/029)
+- [x] ~70 unit + 14 integration (+2 sandbox-ignore) + 3 drift testi
+  (2026-09-13, `cargo test --locked -j2` yeşil; sözleşme kilidi TASK-028)
 
 ### 14.2 v1.5
 
@@ -906,17 +923,20 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 6. Stall skoru float mi boolean mi?
 7. Lisans: dual MIT/Apache-2.0 seçildi (2026-09-09).
 8. Test stratejisi: unit (mock'suz, gerçek regex/stall/CPU) + integration (gerçek daemon) benimsendi.
-9. v1.0.1 bakımı 2026-09-09'da kapatıldı: TASK-006 (artımlı dep-scan), TASK-007 (exec ephemeral handshake), TASK-008 (ölü bağımlılık + bu RFC'deki drift notları).
+9. v0.1.0/v0.1.1 bakımı 2026-09-13'te kapatıldı: TASK-001..030
+   (exec ephemeral handshake, incremental dep-scan, Windows portu, wait--until,
+   status-compact, sock-gc/list, log CLI + cap, dep-patterns, uuid kilidi,
+   sözleşme kilidi, log/list filtreleri, crate hijyeni, crates.io yayını).
 
 ---
 
 ## 16. Referanslar
 
-- `aydemir/opencode-plugins` — `build-mon.sh`, `opencode-settle-noticer`, DHS PTC (varlık kanıtı)
+- `aydemir/opencode-plugins` — `build-mon.mjs`, `hbmon-build-mon.mjs` adapter, `opencode-settle-noticer`, DHS PTC (varlık kanıtı; `.sh` öncüller `scripts/archive/`'da)
 - POSIX: `setsid(2)`, `fork(2)`; Linux: `proc(5)`, `oom(7)`; macOS: `libproc.h`, `proc_pidinfo(3)`
 - Rust: `clap` 4, `serde`/`serde_json` 1, `libc` 0.2, `regex` 1, `once_cell` 1, `rand` 0.8
 - Build sistemleri: Recursive Make Considered Harmful (Miller, 1997); Build Systems à la Carte (Mokhov et al., 2018)
 
 ---
 
-**Doküman sonu. v0.1 Draft + v1 MVP gerçekleşme notları. Geri bildirim ve revizyon için açık.**
+**Doküman sonu. v0.1 Draft + v1 MVP gerçekleşme notları (v0.1.1 ile senkron, TASK-031). Geri bildirim ve revizyon için açık.**

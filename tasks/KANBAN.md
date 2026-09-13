@@ -44,3 +44,4 @@
 | TASK-028 | JSON sözleşme kilidi | done | P1 |
 | TASK-029 | log --event + list --state filtresi | done | P2 |
 | TASK-030 | Crate hijyeni + EN vitrin (v0.1.1) | done | P2 |
+| TASK-031 | HBMON-RFC bayatlık temizliği (Node portu + v0.1.1 senkronu) | done | P2 |

@@ -411,5 +411,17 @@
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-030-crate-hygiene.md"
+  },
+  {
+    "id": "TASK-031",
+    "title": "HBMON-RFC bayatlık temizliği (Node portu + v0.1.1 senkronu)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": ["docs", "rfc", "drift"],
+    "depends_on": ["TASK-030"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-031-rfc-refresh.md"
   }
 ]
