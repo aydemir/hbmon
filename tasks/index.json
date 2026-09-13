@@ -483,5 +483,29 @@
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-036-usage-patterns.md"
+  },
+  {
+    "id": "TASK-037",
+    "title": "GitHub issue template + known-limitations kontrol listesi",
+    "status": "done",
+    "priority": "P3",
+    "environment": "both",
+    "labels": ["docs", "operability", "github"],
+    "depends_on": ["TASK-032"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-037-issue-templates.md"
+  },
+  {
+    "id": "TASK-038",
+    "title": "Örnek skill paketi (skills/hbmon/SKILL.md)",
+    "status": "done",
+    "priority": "P3",
+    "environment": "both",
+    "labels": ["docs", "agents", "harness"],
+    "depends_on": ["TASK-036"],
+    "created": "2026-09-13",
+    "updated": "2026-09-13",
+    "file": "tasks/done/TASK-038-example-skill.md"
   }
 ]

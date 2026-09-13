@@ -50,3 +50,5 @@
 | TASK-034 | Gerçek build smoke testi + stale/orphan politika dokümanı | done | P2 |
 | TASK-035 | HBMON-RFC İngilizce çevirisi (HBMON-RFC-EN.md) | done | P2 |
 | TASK-036 | Tüketici desenleri belgesi (salt CLI / skill / plugin+MCP) | done | P2 |
+| TASK-037 | GitHub issue template + known-limitations kontrol listesi | done | P3 |
+| TASK-038 | Örnek skill paketi (skills/hbmon/SKILL.md) | done | P3 |
