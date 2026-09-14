@@ -3,8 +3,8 @@
 //! Unix: double-fork + setsid + stdio→/dev/null + cwd=/ + umask 077
 //! (mevcut `daemonize()` birebir taşındı). Child `setpgid(0,0)` ile
 //! kendi grubunda başlar — `kill_pgroup` hedefi.
-//! Windows: M3'te self re-spawn (`DETACHED_PROCESS |
-//! CREATE_NEW_PROCESS_GROUP`) + Job Object; M1'de stub.
+//! Windows: self re-spawn (`DETACHED_PROCESS |
+//! CREATE_NEW_PROCESS_GROUP`) + Job Object.
 
 /// Parent'tan kop, daemon bağlamına geç.
 ///

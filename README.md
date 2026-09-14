@@ -6,7 +6,7 @@ Single-binary, zero-runtime-dependency build watcher for LLM coding agents.
 Works with any harness (OpenCode, Claude Code, Aider, …) on any OS — full
 monitoring on Linux (CPU/RSS/IO/FD), process supervision + RSS/FD/path on
 macOS (CPU best-effort), full monitoring on Windows (Toolhelp+RSS/IO/handles;
-net best-effort, cmdline = exe path).
+TCP count via iphlpapi, cmdline = exe path).
 
 ## How it works
 
@@ -22,10 +22,10 @@ policy is outside HBMon's control (see [HBMON-RFC-EN.md](HBMON-RFC-EN.md) §4.2.
 |---|---|---|---|
 | supervision | setsid + double-fork | setsid + double-fork | DETACHED_PROCESS + Job Object |
 | CPU / RSS / IO / FD | full via `/proc` | CPU best-effort; RSS/FD/path via libproc | CPU/RSS/IO/handles via Toolhelp |
-| network | TCP count via `/proc` | — | best-effort |
+| network | TCP count via `/proc` | — | TCP count via iphlpapi (UDP —) |
 | cmdline | full | full | exe path only |
 | OOM suspicion | dmesg | best-effort (dmesg format differs) | none (documented gap) |
-| transport | UDS, files `0600` | UDS, files `0600` | named pipe (no ACL lockdown) |
+| transport | UDS, files `0600` | UDS, files `0600` | named pipe (current-user DACL, `0600` equiv.) |
 | stall / dep-missing / timeout | yes (heuristic) | yes (heuristic) | yes (heuristic) |
 
 ## Install

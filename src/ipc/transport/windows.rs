@@ -133,10 +133,7 @@ impl PipeStream {
             ));
         }
         if err != ERROR_IO_PENDING {
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                format!("pipe io start failed: {}", err),
-            ));
+            return Err(io::Error::other(format!("pipe io start failed: {}", err)));
         }
         match unsafe { WaitForSingleObject(self.event, self.timeout_ms) } {
             WAIT_OBJECT_0 => {
@@ -145,10 +142,9 @@ impl PipeStream {
                 if ok != 0 {
                     Ok(done)
                 } else {
-                    Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("pipe io failed: {}", unsafe { winffi::GetLastError() }),
-                    ))
+                    Err(io::Error::other(format!("pipe io failed: {}", unsafe {
+                        winffi::GetLastError()
+                    })))
                 }
             }
             WAIT_TIMEOUT => {
@@ -157,10 +153,7 @@ impl PipeStream {
                 }
                 Err(io::Error::new(io::ErrorKind::TimedOut, "pipe io timed out"))
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::Other,
-                "pipe wait failed".to_string(),
-            )),
+            _ => Err(io::Error::other("pipe wait failed")),
         }
     }
 }
@@ -208,6 +201,61 @@ impl Write for PipeStream {
     }
 }
 
+/// Current-user-only pipe güvenliği (TASK-041, unix `0600` eşdeğeri).
+/// SDDL `"D:(A;;GA;;;OW)"`: creator-owner'a full erişim, herkese ret.
+/// `serve` her pipe instance'ını bu DACL ile kurar: başka kullanıcı
+/// bağlanamaz (okuyamaz/`kill` gönderemez). Sahibi: bu struct — `Drop`
+/// SD belleğini bırakır; `attrs` yalnızca `serve` döngüsü içinde yaşar.
+struct PipeSecurity {
+    sd: *mut c_void,
+    attrs: winffi::SecurityAttributes,
+}
+
+impl PipeSecurity {
+    fn current_user() -> Result<Self, String> {
+        unsafe {
+            let sddl = winffi::wide_nul("D:(A;;GA;;;OW)");
+            let mut sd: *mut c_void = ptr::null_mut();
+            let mut len: winffi::DWORD = 0;
+            let ok = winffi::ConvertStringSecurityDescriptorToSecurityDescriptorW(
+                sddl.as_ptr(),
+                winffi::SDDL_REVISION,
+                &mut sd,
+                &mut len,
+            );
+            if ok == 0 || sd.is_null() {
+                return Err(format!("pipe acl: sddl {}", winffi::GetLastError()));
+            }
+            let mut sec = Self {
+                sd,
+                attrs: winffi::SecurityAttributes {
+                    len: 0,
+                    descriptor: ptr::null_mut(),
+                    inherit: 0,
+                },
+            };
+            sec.attrs.len = std::mem::size_of::<winffi::SecurityAttributes>() as winffi::DWORD;
+            sec.attrs.descriptor = sd;
+            sec.attrs.inherit = 0;
+            Ok(sec)
+        }
+    }
+
+    fn attrs_ptr(&mut self) -> *mut c_void {
+        &mut self.attrs as *mut _ as *mut c_void
+    }
+}
+
+impl Drop for PipeSecurity {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.sd.is_null() {
+                winffi::LocalFree(self.sd);
+            }
+        }
+    }
+}
+
 /// Blocking per-connection server: accept -> read one request ->
 /// handler -> write one response -> close (RFC: no persistent conns).
 /// Her bağlantı kendi pipe instance'ını alır (unix `accept` eşdeğeri).
@@ -216,6 +264,9 @@ where
     F: Fn(Value) -> Value + Send + Sync + 'static,
 {
     let name = winffi::wide_nul(addr.pipe_name());
+    // TASK-041: DACL kurulumu fail-closed — kurulamazsa açık pipe
+    // dinlemektense düş.
+    let mut sec = PipeSecurity::current_user().map_err(|e| format!("pipe bind: {}", e))?;
     loop {
         let h = unsafe {
             CreateNamedPipeW(
@@ -226,7 +277,7 @@ where
                 65536,
                 65536,
                 0,
-                ptr::null_mut(),
+                sec.attrs_ptr(),
             )
         };
         if !winffi::valid(h) {
@@ -382,5 +433,32 @@ mod tests {
         let req = serde_json::json!({"v":1,"op":"status","id":"t-9"});
         assert!(send_request(&addr, &req, 2).is_err());
         assert!(!can_connect(&addr));
+    }
+
+    #[test]
+    fn pipe_acl_security_binds() {
+        // TASK-041: current-user DACL ile pipe kurulabilmeli ve
+        // aynı kullanıcı bağlanabilmeli (can_connect probe dahil).
+        let addr = test_addr("acl-bind");
+        let mut sec = PipeSecurity::current_user().expect("acl build");
+        let name = winffi::wide_nul(addr.pipe_name());
+        let h = unsafe {
+            CreateNamedPipeW(
+                name.as_ptr(),
+                PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
+                PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+                1,
+                4096,
+                4096,
+                0,
+                sec.attrs_ptr(),
+            )
+        };
+        assert!(winffi::valid(h), "CreateNamedPipeW acl: {}", unsafe {
+            winffi::GetLastError()
+        });
+        unsafe {
+            winffi::CloseHandle(h);
+        }
     }
 }

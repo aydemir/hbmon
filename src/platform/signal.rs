@@ -3,8 +3,8 @@
 //! Wire'da sinyal SAYI olarak taşınır (`protocol.rs` `signal: i32`
 //! değişmez): Term=15, Kill=9, Int=2, Hup=1 — unix numaralarıyla
 //! birebir, böylece eski/yeni client-daemon karışımları uyumlu kalır.
-//! Unix'te `kill(-pgid)` aynen; Windows'ta Job-Object karşılığı M3'te
-//! dolar (M1 stub: no-op).
+//! Unix'te `kill(-pgid)` aynen; Windows'ta Job-Object karşılığı
+//! (`windows_kill`: kayıtlı job → `TerminateJobObject`, yoksa tree-kill).
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Sig {
@@ -60,7 +60,7 @@ pub fn parse_signal(s: &str) -> Result<Sig, String> {
 /// Unix: `kill(-pgid)`. Windows: Job-Object terminate (M3);
 /// job atanamadıysa ağaçça `TerminateProcess` fallback.
 /// Windows'ta graceful TERM yok — Term de Kill de terminate eder
-/// (RFC'ye M4'te not düşülür). Dönüş: sinyal gönderilebildi mi?
+/// (RFC §4.5 Windows notu). Dönüş: sinyal gönderilebildi mi?
 pub fn kill_pgroup(pid: u32, sig: Sig) -> bool {
     #[cfg(unix)]
     unsafe {
@@ -99,6 +99,8 @@ pub fn register_job(pid: u32, job: super::winffi::HANDLE) {
 
 #[cfg(windows)]
 fn windows_kill(pid: u32, sig: Sig) -> bool {
+    // TASK-042: graceful TERM mimari olarak imkânsız (daemon console'suz;
+    // GenerateConsoleCtrlEvent hedefe ulaşamaz) → Term/Kill ayrımı yok.
     let _ = sig; // Windows: Term/Kill ayrımı yok (terminate).
     let job = JOBS
         .get()

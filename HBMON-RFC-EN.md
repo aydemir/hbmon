@@ -790,7 +790,8 @@ pub trait ProcessInspector: Send + Sync {
   `GetProcessTimes` for raw CPU time (centisecond → `CpuTracker` unchanged),
   `GetProcessIoCounters` for IO counters, `GetProcessHandleCount` for fds;
   named-pipe transport (`\\.\pipe\hbmon-<uuid>`), wire format v1 unchanged.
-  Documented gaps: `net_tcp/net_udp` = 0, `cmdline` = exe path (not argv).
+  Documented gaps: `net_udp` = 0 (no owner-mapped UDP table),
+  `cmdline` = exe path (not argv).
 
 CPU percentage always requires a delta → `CpuTracker` (jiffies difference / elapsed time, 100Hz assumption).
 
@@ -850,7 +851,9 @@ Required minimum: **shell command + file read.** Both exist in all modern harnes
 
 ## 13. Security, Limitations, and Race Conditions
 
-- **File permissions:** pid/sock/jsonl/out all `0600` (Windows: default ACL + `%TEMP%`; pipe `\\.\pipe\hbmon-<uuid>`); symlinks rejected at open (`O_EXCL` + ownership check).
+- **File permissions:** pid/sock/jsonl/out all `0600` (Windows: `%TEMP%` files under
+  default ACL; pipe `\\.\pipe\hbmon-<uuid>` created with a current-user-only DACL —
+  unix `0600` equivalent, no cross-user connect — TASK-041); symlinks rejected at open (`O_EXCL` + ownership check).
 - **Path injection:** paths containing `..` are rejected; `--uuid` is additionally charset-locked (`1..=64` chars, `[A-Za-z0-9_-]` — TASK-027; production uuid is 16 hex chars / 64-bit).
 - **Resource limit:** daemon ~10MB RAM, <%1 CPU idle target.
 - **Double spawn:** if a live socket exists, `MONITOR_ALREADY_EXISTS`.

@@ -1,8 +1,8 @@
 //! Ham Win32 FFI ortakları (bağımlılık yok — `macos.rs` libproc emsali).
 //!
 //! Sadece kararlı kernel32/psapi giriş noktaları; her çağrı dönüş kodu
-//! kontrol eder, asla paniklemez. M2: named-pipe transport.
-//! M3: process inspection (Toolhelp + psapi) + Job Object.
+//! kontrol eder, asla paniklemez. Named-pipe transport + process
+//! inspection (Toolhelp + psapi) + Job Object.
 
 use std::ffi::c_void;
 
@@ -163,7 +163,69 @@ extern "system" {
     pub fn TerminateJobObject(job: HANDLE, code: DWORD) -> BOOL;
 }
 
-// ---- Detached spawn: bInheritHandles=FALSE zorunlu (M4) ----
+// ---- Pipe ACL: current-user-only DACL (TASK-041) ----
+//
+// Unix `0600` eşdeğeri: pipe'a SADECE çalıştıran kullanıcı bağlanır.
+// SDDL `"D:(A;;GA;;;OW)"` (creator-owner'a full) ham FFI ile kurulur,
+// yeni crate yok. Başarısızlık fail-closed'dur (serve Err ile düşer).
+// Not: el-yapımı absolute SD denendi — 64-bit SD boyu (40) doğru olsa
+// bile `CreateNamedPipeW` 1305 verdi; self-relative SDDL yolu çalışıyor.
+
+pub const SDDL_REVISION: DWORD = 1;
+#[repr(C)]
+pub struct SecurityAttributes {
+    pub len: DWORD,
+    pub descriptor: *mut c_void,
+    pub inherit: BOOL,
+}
+
+extern "system" {
+    pub fn LocalFree(mem: *mut c_void) -> *mut c_void;
+}
+
+#[link(name = "advapi32")]
+extern "system" {
+    pub fn ConvertStringSecurityDescriptorToSecurityDescriptorW(
+        sddl: *const u16,
+        revision: DWORD,
+        sd: *mut *mut c_void,
+        len: *mut DWORD,
+    ) -> BOOL;
+}
+
+// ---- TCP sayımı: GetExtendedTcpTable (TASK-043) ----
+//
+// Linux `/proc/net/tcp` eşdeğeri: izlenen pid'in TCP satır sayısı.
+// UDP için sahip-eşlemeli tablo yok → `net_udp` 0 kalır (belgeli).
+// Best-effort: hata = 0, daemon asla etkilenmez.
+
+pub const AF_INET: DWORD = 2;
+pub const TCP_TABLE_OWNER_PID_ALL: DWORD = 5; // TCP_TABLE_CLASS
+pub const NO_ERROR: DWORD = 0;
+pub const ERROR_INSUFFICIENT_BUFFER: DWORD = 122;
+
+#[repr(C)]
+pub struct TcpRowOwnerPid {
+    pub state: DWORD,
+    pub local_addr: DWORD,
+    pub local_port: DWORD,
+    pub remote_addr: DWORD,
+    pub remote_port: DWORD,
+    pub owning_pid: DWORD,
+}
+
+#[link(name = "iphlpapi")]
+extern "system" {
+    pub fn GetExtendedTcpTable(
+        table: *mut c_void,
+        size: *mut DWORD,
+        order: BOOL,
+        family: DWORD,
+        table_class: DWORD,
+        reserved: DWORD,
+    ) -> DWORD;
+}
+// ---- Detached spawn: bInheritHandles=FALSE zorunlu (TASK-006 M4) ----
 //
 // std::Command null-stdio + creation_flags ile bile capture pipe'larını
 // devralır (bInheritHandles proses-genelidir; NUL handle'ları inheritable

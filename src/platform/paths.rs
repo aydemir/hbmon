@@ -309,3 +309,78 @@ fn pipe_probe(name: &str) -> bool {
         true
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uuid_from_artifact_names() {
+        assert_eq!(
+            uuid_from_base("hbmon-a3f9c1e2.sock"),
+            Some("a3f9c1e2".to_string())
+        );
+        assert_eq!(
+            uuid_from_base("hbmon-a3f9c1e2.jsonl"),
+            Some("a3f9c1e2".to_string())
+        );
+        assert_eq!(
+            uuid_from_base(r"\\.\pipe\hbmon-a3f9c1e2"),
+            Some("a3f9c1e2".to_string())
+        );
+        assert_eq!(uuid_from_base("hbmon-.sock"), None);
+        assert_eq!(uuid_from_base("other-a3f9c1e2.sock"), None);
+        assert_eq!(uuid_from_base("hbmon-"), None);
+    }
+
+    #[test]
+    fn default_addrs_match_convention() {
+        let s = default_sock("a3f9c1e2");
+        #[cfg(unix)]
+        assert_eq!(sock_display(&s), "/tmp/hbmon-a3f9c1e2.sock");
+        #[cfg(windows)]
+        assert_eq!(sock_display(&s), r"\\.\pipe\hbmon-a3f9c1e2");
+        assert!(default_log("a3f9c1e2").ends_with("hbmon-a3f9c1e2.jsonl"));
+        assert!(default_pidfile("a3f9c1e2").ends_with("hbmon-a3f9c1e2.pid"));
+        assert!(default_out("a3f9c1e2").ends_with("hbmon-a3f9c1e2.out"));
+    }
+
+    #[test]
+    fn env_value_maps_to_sock() {
+        #[cfg(unix)]
+        {
+            let s = from_env("/tmp/hbmon-x.sock");
+            assert_eq!(sock_display(&s), "/tmp/hbmon-x.sock");
+        }
+        #[cfg(windows)]
+        {
+            let full = from_env(r"\\.\pipe\hbmon-x");
+            assert_eq!(sock_display(&full), r"\\.\pipe\hbmon-x");
+            let bare = from_env("hbmon-x");
+            assert_eq!(sock_display(&bare), r"\\.\pipe\hbmon-x");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn explicit_windows_forms_recover_uuid() {
+        use std::path::PathBuf;
+        // Tam pipe adı aynen geçer.
+        let a = from_explicit(PathBuf::from(r"\\.\pipe\hbmon-abc"));
+        assert_eq!(sock_display(&a), r"\\.\pipe\hbmon-abc");
+        // Unix-tarzı sock yolu uuid'ye indirgenir.
+        let b = from_explicit(PathBuf::from("/tmp/hbmon-abc.sock"));
+        assert_eq!(sock_display(&b), r"\\.\pipe\hbmon-abc");
+        // Çıplak ad pipe yapılır.
+        let c = from_explicit(PathBuf::from("hbmon-abc"));
+        assert_eq!(sock_display(&c), r"\\.\pipe\hbmon-abc");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn explicit_unix_is_identity() {
+        use std::path::PathBuf;
+        let p = PathBuf::from("/tmp/hbmon-abc.sock");
+        assert_eq!(from_explicit(p.clone()), p);
+    }
+}

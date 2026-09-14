@@ -68,8 +68,30 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
   karışıklığı iddiası asılsız, değişiklik yok.
 
 ## 2026-09-13 — RFC İngilizce eşdeğeri (TASK-035)
-
 - `HBMON-RFC-EN.md`: `HBMON-RFC.md`'nin birebir çevirisi (73 başlık,
   68 ``` çiti, kod blokları bayt-ayni). Çelişmede Türkçe asıl normatiftir.
 - `README.md` (EN) linkleri EN belgeye çevrildi; `README.tr.md` Türkçe
   belgede kaldı. Frozen terimler çevrilmedi (op/state adları, exit kodları).
+
+## 2026-09-14 — Windows graceful TERM imkânsız (TASK-042, won't-fix)
+
+- TASK-006/M3-13 `TERM→GenerateConsoleCtrlEvent(CTRL_BREAK)` planlamıştı.
+  Mimari kanıt: daemon `DETACHED_PROCESS` + console yok
+  (`detach.rs:windows_detach`), child console devralmaz →
+  `GenerateConsoleCtrlEvent` hedefe ulaşamaz (yalnızca console'lu grup).
+  Console'lu spawn'a dönüş detach'ı deler → kilit ihlali.
+- Hüküm: Term=Kill=terminate kalır (RFC §4.5'te zaten belgeli).
+  `signal.rs:windows_kill` yorumu kapatıldı; bug template'e
+  "graceful TERM yok" kutusu eklendi.
+
+## 2026-09-14 — Windows cmdline/OOM araştırma (TASK-043, won't-fix)
+
+- `cmdline` tam argv: PEB okuma (`NtQueryInformationProcess` +
+  `ReadProcessMemory`) WOW64/protected süreçlerde fragile, WMI ise COM
+  maliyetiyle kilit ruhuna (küçük binary, sıfır bağımlılık) aykırı →
+  exe yolu kalır (macOS "path, not argv" emsali).
+- OOM: EventLog (`Resource-Exhaustion`) okuma ağır + yetki ister,
+  "best-effort, never fatal" ilkesini yorar → `oom.rs` boş-dönüş kalır.
+- Kapatılan: `net_tcp` — `GetExtendedTcpTable` (iphlpapi, ham FFI)
+  ile sahip-pid sayımı eklendi; `net_udp` 0 kalır (sahip-eşlemeli
+  UDP tablosu yok). README/RFC satırları güncellendi.

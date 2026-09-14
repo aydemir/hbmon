@@ -800,7 +800,8 @@ pub trait ProcessInspector: Send + Sync {
   zaman için `GetProcessTimes` (centisecond → `CpuTracker` aynen),
   IO sayaçları için `GetProcessIoCounters`, fd için `GetProcessHandleCount`;
   transport named pipe (`\\.\pipe\hbmon-<uuid>`), wire format v1 değişmez.
-  Belgeli eksikler: `net_tcp/net_udp` = 0, `cmdline` = exe yolu (argv değil).
+  Belgeli eksikler: `net_udp` = 0 (sahip-eşlemeli UDP tablosu yok),
+  `cmdline` = exe yolu (argv değil).
 
 CPU yüzdesi her zaman delta gerektirir → `CpuTracker` (jiffies farkı / geçen süre, 100Hz varsayımı).
 
@@ -863,8 +864,9 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 
 ## 13. Güvenlik, Sınırlamalar ve Yarış Koşulları
 
-- **Dosya izinleri:** pid/sock/jsonl/out hepsi `0600` (Windows: ACL
-  varsayılanı + `%TEMP%`; pipe `\\.\pipe\hbmon-<uuid>`); symlink açılışta reddedilir (`O_EXCL` + sahiplik kontrolü).
+- **Dosya izinleri:** pid/sock/jsonl/out hepsi `0600` (Windows: `%TEMP%` dosyaları
+  ACL varsayılanı; pipe `\\.\pipe\hbmon-<uuid>` current-user-only DACL ile kurulur —
+  unix `0600` eşdeğeri, cross-user bağlanma yok — TASK-041); symlink açılışta reddedilir (`O_EXCL` + sahiplik kontrolü).
 - **Path injection:** `..` içeren path'ler reddedilir; `--uuid` ayrıca
   charset kilitlidir (`1..=64` char, `[A-Za-z0-9_-]` — TASK-027; üretim
   uuid'si 16 hex char / 64-bit).

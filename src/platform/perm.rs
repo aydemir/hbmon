@@ -2,8 +2,9 @@
 //!
 //! `OpenOptionsExt::mode` unix-only olduğu için çağrı noktaları
 //! `std::os::unix` import edemezdi. `SecureMode::secure_mode` her
-//! platformda derlenir: unix'te mode bitini koyar, Windows'ta no-op
-//! (ACL varsayılanı; bkz. TASK-006 ilke notu).
+//! platformda derlenir: unix'te mode bitini koyar, Windows'ta dosya
+//! için no-op (ACL varsayılanı; pipe tarafı current-user DACL ile
+//! kurulur — `transport::windows::PipeSecurity`, TASK-041).
 
 use std::fs::OpenOptions;
 use std::path::Path;

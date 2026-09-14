@@ -50,4 +50,4 @@ confirm with `status --compact` + `log --event metric` before acting.
 
 Per monitor: `.sock` `.pid` `.jsonl` `.out` under `/tmp` (unix) —
 created `0600`. `hbmon cleanup` removes stale files but never touches a
-live daemon's siblings. Windows uses named pipes (no ACL lockdown).
+live daemon's siblings. Windows uses named pipes (current-user-only DACL).

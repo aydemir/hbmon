@@ -507,5 +507,89 @@
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-038-example-skill.md"
+  },
+  {
+    "id": "TASK-039",
+    "title": "Windows clippy sıfırlama (Rust 1.98 lintleri)",
+    "status": "done",
+    "priority": "P1",
+    "environment": "windows",
+    "labels": ["windows", "clippy", "hygiene"],
+    "depends_on": ["TASK-006"],
+    "created": "2026-09-14",
+    "updated": "2026-09-14",
+    "file": "tasks/done/TASK-039-windows-clippy.md"
+  },
+  {
+    "id": "TASK-040",
+    "title": "cleanup Windows live-guard deliği",
+    "status": "done",
+    "priority": "P1",
+    "environment": "windows",
+    "labels": ["windows", "cli", "gc", "correctness"],
+    "depends_on": ["TASK-022"],
+    "created": "2026-09-14",
+    "updated": "2026-09-14",
+    "file": "tasks/done/TASK-040-cleanup-windows-guard.md"
+  },
+  {
+    "id": "TASK-041",
+    "title": "Named-pipe ACL kilidi (current-user DACL)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "windows",
+    "labels": ["windows", "security", "ipc"],
+    "depends_on": ["TASK-006", "TASK-034"],
+    "created": "2026-09-14",
+    "updated": "2026-09-14",
+    "file": "tasks/done/TASK-041-pipe-acl.md"
+  },
+  {
+    "id": "TASK-042",
+    "title": "Windows graceful TERM yoklaması (CTRL_BREAK)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "windows",
+    "labels": ["windows", "daemon", "signals"],
+    "depends_on": ["TASK-006"],
+    "created": "2026-09-14",
+    "updated": "2026-09-14",
+    "file": "tasks/done/TASK-042-graceful-term-probe.md"
+  },
+  {
+    "id": "TASK-043",
+    "title": "Windows net sayımı (GetTcpTable) + cmdline/OOM araştırma",
+    "status": "done",
+    "priority": "P3",
+    "environment": "windows",
+    "labels": ["windows", "metrics", "research"],
+    "depends_on": ["TASK-006"],
+    "created": "2026-09-14",
+    "updated": "2026-09-14",
+    "file": "tasks/done/TASK-043-windows-net-count.md"
+  },
+  {
+    "id": "TASK-044",
+    "title": "Windows test borcu (paths unit + ignored + boyut notu)",
+    "status": "done",
+    "priority": "P2",
+    "environment": "windows",
+    "labels": ["windows", "tests"],
+    "depends_on": ["TASK-006"],
+    "created": "2026-09-14",
+    "updated": "2026-09-14",
+    "file": "tasks/done/TASK-044-windows-test-debt.md"
+  },
+  {
+    "id": "TASK-045",
+    "title": "Milestone-dili doc drift temizliği (M1-stub yorumları)",
+    "status": "done",
+    "priority": "P3",
+    "environment": "both",
+    "labels": ["docs", "hygiene"],
+    "depends_on": ["TASK-006"],
+    "created": "2026-09-14",
+    "updated": "2026-09-14",
+    "file": "tasks/done/TASK-045-doc-drift.md"
   }
 ]

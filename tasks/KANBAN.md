@@ -52,3 +52,10 @@
 | TASK-036 | Tüketici desenleri belgesi (salt CLI / skill / plugin+MCP) | done | P2 |
 | TASK-037 | GitHub issue template + known-limitations kontrol listesi | done | P3 |
 | TASK-038 | Örnek skill paketi (skills/hbmon/SKILL.md) | done | P3 |
+| TASK-039 | Windows clippy sıfırlama (Rust 1.98 lintleri) | done | P1 |
+| TASK-040 | cleanup Windows live-guard deliği | done | P1 |
+| TASK-041 | Named-pipe ACL kilidi (current-user DACL) | done | P2 |
+| TASK-042 | Windows graceful TERM yoklaması (CTRL_BREAK) | done | P2 |
+| TASK-043 | Windows net sayımı (GetTcpTable) + cmdline/OOM araştırma | done | P3 |
+| TASK-044 | Windows test borcu (paths unit + ignored + boyut notu) | done | P2 |
+| TASK-045 | Milestone-dili doc drift temizliği | done | P3 |

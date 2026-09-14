@@ -77,7 +77,7 @@ pub fn resolve_sock(explicit: Option<PathBuf>) -> Result<SockAddr, String> {
             return Ok(paths::from_env(&e));
         }
     }
-    // convention scan: newest sock (unix); windows M2'de pipe enumerate.
+    // convention scan: newest sock (unix) / pipe (windows).
     paths::scan_newest_sock()
         .ok_or_else(|| "no monitor found: pass --sock or set HBMON_SOCK".to_string())
 }
@@ -99,15 +99,9 @@ fn run_cleanup(a: CleanupArgs) -> Result<i32, String> {
                 .collect()
         })
         .unwrap_or_default();
-    // Canlı guard (TASK-022): sock'u dinlenen daemon'un kardeş dosyalarına
-    // (.jsonl/.out/.pid) dokunma — yaşa bakılmaksızın.
-    let live: std::collections::HashSet<String> = entries
-        .iter()
-        .filter(|(n, p)| {
-            n.ends_with(".sock") && crate::ipc::can_connect(&paths::from_explicit(p.clone()))
-        })
-        .filter_map(|(n, _)| paths::uuid_from_base(n))
-        .collect();
+    // Canlı guard (TASK-022 + TASK-040): sock'u/pipe'ı dinlenen daemon'un
+    // kardeş dosyalarına (.jsonl/.out/.pid) dokunma — yaşa bakılmaksızın.
+    let live: std::collections::HashSet<String> = live_uuids(&entries);
     let mut removed = 0u32;
     for (name, path) in &entries {
         let age_ok = std::fs::metadata(path)
@@ -125,6 +119,47 @@ fn run_cleanup(a: CleanupArgs) -> Result<i32, String> {
     Ok(0)
 }
 
+/// Canlı daemon uuid'leri (TASK-022 guard, TASK-040 Windows kolu).
+/// Unix: `.sock` girdisine bağlanılabilenler. Windows: pipe dosya
+/// değildir, `%TEMP%`'te `.sock` oluşmaz → her aday uuid'nin pipe'ı
+/// (`default_sock`) yoklanır; yoksa guard ölü kalırdı.
+fn live_uuids(entries: &[(String, PathBuf)]) -> std::collections::HashSet<String> {
+    entries
+        .iter()
+        .filter_map(|(name, path)| {
+            let uuid = paths::uuid_from_base(name)?;
+            let addr = live_probe_addr(&uuid, path)?;
+            if crate::ipc::can_connect(&addr) {
+                Some(uuid)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Canlılık yoklaması için adres: unix'te SADECE `.sock` dosyasının
+/// kendisi (`.jsonl`/`.pid` yoklanırsa yanlış-aile eşleşmesi olur);
+/// Windows'ta uuid'den türetilen pipe adı.
+fn live_probe_addr(uuid: &str, path: &std::path::Path) -> Option<paths::SockAddr> {
+    #[cfg(unix)]
+    {
+        let _ = uuid;
+        let is_sock = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.ends_with(".sock"));
+        if !is_sock {
+            return None;
+        }
+        Some(paths::from_explicit(path.to_path_buf()))
+    }
+    #[cfg(windows)]
+    {
+        let _ = path;
+        Some(paths::default_sock(uuid))
+    }
+}
 /// Silme kararı (TASK-022, saf mantık — birim testli): canlı ailenin
 /// dosyaları yaşa bakılmaksızın korunur; diğerleri yaş kuralına kalır.
 fn sweep_decision(name: &str, live: &std::collections::HashSet<String>) -> bool {
@@ -166,5 +201,25 @@ mod tests {
     fn empty_live_set_sweeps_all() {
         let live = live_set(&[]);
         assert!(sweep_decision("hbmon-abc123.sock", &live));
+    }
+
+    #[test]
+    fn live_probe_addr_platform_rules() {
+        use std::path::PathBuf;
+        // .sock her platformda yoklanır; .jsonl/.pid unix'te yoklanmaz
+        // (yanlış-aile eşleşmesi), Windows'ta uuid→pipe türetilir.
+        let sock = PathBuf::from("hbmon-abc123.sock");
+        assert!(super::live_probe_addr("abc123", &sock).is_some());
+        let log = PathBuf::from("hbmon-abc123.jsonl");
+        #[cfg(unix)]
+        assert!(super::live_probe_addr("abc123", &log).is_none());
+        #[cfg(windows)]
+        {
+            let addr = super::live_probe_addr("abc123", &log).expect("pipe türetilir");
+            assert_eq!(
+                crate::platform::paths::sock_display(&addr),
+                r"\\.\pipe\hbmon-abc123"
+            );
+        }
     }
 }

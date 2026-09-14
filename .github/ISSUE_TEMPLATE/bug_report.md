@@ -7,7 +7,9 @@ body:
     attributes:
       value: |
         Önce bilinen limitation'ları ele (hepsi `README.md` → Platform support):
-        - [ ] Windows named pipe'ta ACL kilidi yok (`no ACL lockdown`) — multi-user makinede başkasının build'i görülebilir/öldürülebilir.
+        - [ ] Windows pipe'ı current-user-only'dir (TASK-041) — başka kullanıcı
+          olarak bağlanamamak bug değil, tasarımdır.
+        - [ ] Windows'ta graceful TERM yok (terminate) — `kill` sonrası `failed` normaldir.
         - [ ] cgroup reaping HBMon kontrolünde değil ([HBMON-RFC.md](../../HBMON-RFC.md) §4.2.1) — "niye öldü?" önce host/harness politikasına bak.
         - [ ] macOS CPU best-effort; ağ sayımı yok.
         - [ ] Windows cmdline = exe yolu (tam komut satırı yok).

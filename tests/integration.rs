@@ -477,19 +477,32 @@ fn list_shows_live_monitors_by_uuid() {
     let dir_s = dir.path().to_string_lossy().to_string();
     let ida = uuid("list-a");
     let idb = uuid("list-b");
+    // Hermetik + tutarlı: --sock gövdesi --uuid ile AYNI olmalı
+    // (list uuid'yi dosya/pipe adından türetir); --log dizinde olmalı
+    // (Windows list taraması .jsonl izlerine dayanır).
     let sa = dir
         .path()
-        .join("hbmon-t-a.sock")
+        .join(format!("hbmon-{}.sock", ida))
         .to_string_lossy()
         .to_string();
     let sb = dir
         .path()
-        .join("hbmon-t-b.sock")
+        .join(format!("hbmon-{}.sock", idb))
         .to_string_lossy()
         .to_string();
-    for (id, sock, cmd) in [
-        (&ida, sa.clone(), sleep_cmd(30)),
-        (&idb, sb.clone(), sleep_cmd(30)),
+    let la = dir
+        .path()
+        .join(format!("hbmon-{}.jsonl", ida))
+        .to_string_lossy()
+        .to_string();
+    let lb = dir
+        .path()
+        .join(format!("hbmon-{}.jsonl", idb))
+        .to_string_lossy()
+        .to_string();
+    for (id, sock, log, cmd) in [
+        (&ida, sa.clone(), la.clone(), sleep_cmd(30)),
+        (&idb, sb.clone(), lb.clone(), sleep_cmd(30)),
     ] {
         let mut args = vec![
             "watch".to_string(),
@@ -498,6 +511,8 @@ fn list_shows_live_monitors_by_uuid() {
             id.to_string(),
             "--sock".to_string(),
             sock,
+            "--log".to_string(),
+            log,
             "--".to_string(),
         ];
         args.extend(cmd);
@@ -623,9 +638,17 @@ fn cleanup_protects_live_daemon_files() {
     let dir = tempfile::tempdir().unwrap();
     let dir_s = dir.path().to_string_lossy().to_string();
     let id = uuid("cleanup-guard");
+    // --sock gövdesi --uuid ile aynı (list/guard uuid'yi addan türetir),
+    // --log dizinde (Windows guard yoklaması .jsonl izine dayanır —
+    // yoksa test guard'ı gerçekten denemez).
     let sock = dir
         .path()
-        .join("hbmon-guard.sock")
+        .join(format!("hbmon-{}.sock", id))
+        .to_string_lossy()
+        .to_string();
+    let log = dir
+        .path()
+        .join(format!("hbmon-{}.jsonl", id))
         .to_string_lossy()
         .to_string();
     let mut args = vec![
@@ -635,6 +658,8 @@ fn cleanup_protects_live_daemon_files() {
         id.clone(),
         "--sock".to_string(),
         sock.clone(),
+        "--log".to_string(),
+        log,
         "--".to_string(),
     ];
     args.extend(sleep_cmd(30));
@@ -658,11 +683,15 @@ fn cleanup_protects_live_daemon_files() {
     assert!(c.status.success());
     let cv: Value = serde_json::from_slice(&c.stdout).unwrap();
     assert_eq!(cv["removed"], 2, "yalnızca ölü süsler: {}", c.stdout.len());
-    // Canlı koruması: sock yerinde, daemon hizmette.
+    // Canlı koruması: sock yerinde, canlı ailenin .jsonl'i sağ, daemon hizmette.
     #[cfg(unix)]
     assert!(
-        dir.path().join("hbmon-guard.sock").exists(),
+        dir.path().join(format!("hbmon-{}.sock", id)).exists(),
         "canlı sock silinmemeli"
+    );
+    assert!(
+        dir.path().join(format!("hbmon-{}.jsonl", id)).exists(),
+        "canlı daemonun .jsonl'i silinmemeli"
     );
     let st = hbmon()
         .args(["status", "--sock", &sock])
@@ -670,7 +699,8 @@ fn cleanup_protects_live_daemon_files() {
         .output()
         .unwrap();
     assert!(st.status.success());
-    // Kapanınca dizin boşalır (daemon pidfile+sock'u kendisi kaldırır).
+    // Kapanınca daemon pidfile+sock'u kendisi kaldırır; .jsonl/.out
+    // tasarım gereği KALIR (okunabilir geçmiş, ölü süs değil).
     hbmon()
         .args(["shutdown", "--sock", &sock])
         .timeout(Duration::from_secs(10))
@@ -679,7 +709,11 @@ fn cleanup_protects_live_daemon_files() {
     let deadline = std::time::Instant::now() + Duration::from_secs(15);
     loop {
         let left: Vec<_> = std::fs::read_dir(dir.path()).unwrap().flatten().collect();
-        if left.is_empty() {
+        let settled = left.iter().all(|e| {
+            let n = e.file_name().to_string_lossy().to_string();
+            n.ends_with(".jsonl") || n.ends_with(".out")
+        });
+        if settled {
             break;
         }
         if std::time::Instant::now() >= deadline {

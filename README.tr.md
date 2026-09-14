@@ -6,7 +6,7 @@ LLM kodlama ajanları için tek ikilik, sıfır-runtime-bağımlılık derleme i
 Hangi harness kullanılırsa kullanılsın (OpenCode, Claude Code, Aider, …),
 hangi OS olursa olsun çalışır — Linux'ta tam izleme (CPU/RSS/IO/FD),
 macOS'ta süreç gözetimi + RSS/FD/yol (CPU best-effort), Windows'ta tam
-izleme (Toolhelp+RSS/IO/handle; net best-effort, cmdline = exe yolu).
+izleme (Toolhelp+RSS/IO/handle; iphlpapi ile TCP sayımı, cmdline = exe yolu).
 
 ## Nasıl çalışır
 
@@ -22,10 +22,10 @@ cgroup politikası HBMon'un kontrol alanı dışındadır (detay [HBMON-RFC.md](
 |---|---|---|---|
 | gözetim | setsid + double-fork | setsid + double-fork | DETACHED_PROCESS + Job Object |
 | CPU / RSS / IO / FD | `/proc` ile tam | CPU best-effort; RSS/FD/yol libproc ile | Toolhelp ile CPU/RSS/IO/handle |
-| ağ | `/proc` ile TCP sayımı | — | best-effort |
+| ağ | `/proc` ile TCP sayımı | — | iphlpapi ile TCP sayımı (UDP —) |
 | cmdline | tam | tam | yalnızca exe yolu |
 | OOM şüphesi | dmesg | best-effort (dmesg formatı farklı) | yok (belgeli eksik) |
-| transport | UDS, dosyalar `0600` | UDS, dosyalar `0600` | named pipe (ACL kilidi yok) |
+| transport | UDS, dosyalar `0600` | UDS, dosyalar `0600` | named pipe (current-user DACL, `0600` eşdeğeri) |
 | stall / dep-missing / timeout | evet (heuristic) | evet (heuristic) | evet (heuristic) |
 
 ## Kurulum

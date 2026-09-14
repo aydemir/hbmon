@@ -10,7 +10,9 @@
 //! - `fds_open`: `GetProcessHandleCount` (best-effort)
 //! - `io_*`: `GetProcessIoCounters` (gerçek sayaç — stall dedektörünün
 //!   IO bacağı Windows'ta da çalışır)
-//! - `net_*`: 0 (belgeli eksik)
+//! - `net_tcp`: `GetExtendedTcpTable` (iphlpapi) ile sahip-pid eşleşen
+//!   TCP satır sayısı; `net_udp` = 0 (sahip-eşlemeli UDP tablosu yok,
+//!   belgeli eksik)
 //! - `is_alive`: `GetExitCodeProcess != STILL_ACTIVE`
 //!
 //! Her FFI dönüşü kontrol edilir; tek başarısız pid tüm ağacı
@@ -25,6 +27,11 @@ mod inner {
     use crate::platform::winffi;
 
     pub struct WindowsInspector;
+    impl Default for WindowsInspector {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
     impl WindowsInspector {
         pub fn new() -> Self {
             Self
@@ -60,6 +67,57 @@ mod inner {
             return None;
         }
         Some((kernel.as_u64().saturating_add(user.as_u64())) / 100_000)
+    }
+
+    /// Bu pid'in sahip olduğu TCP bağlantı sayısı (TASK-043).
+    /// Best-effort: tablo okunamazsa 0.
+    pub fn net_tcp_for(pid: u32) -> u32 {
+        unsafe {
+            let mut size: u32 = 0;
+            // Boy öğrenme turu (122 = yetersiz tampon, beklenen).
+            winffi::GetExtendedTcpTable(
+                std::ptr::null_mut(),
+                &mut size,
+                0,
+                winffi::AF_INET,
+                winffi::TCP_TABLE_OWNER_PID_ALL,
+                0,
+            );
+            if size == 0 || size > 64 * 1024 * 1024 {
+                return 0;
+            }
+            let mut buf = vec![0u8; size as usize];
+            let mut rc = winffi::GetExtendedTcpTable(
+                buf.as_mut_ptr() as *mut std::ffi::c_void,
+                &mut size,
+                0,
+                winffi::AF_INET,
+                winffi::TCP_TABLE_OWNER_PID_ALL,
+                0,
+            );
+            if rc == winffi::ERROR_INSUFFICIENT_BUFFER {
+                // Tablo arada büyüdü: bir kez yeni boyla dene.
+                buf.resize(size as usize, 0);
+                rc = winffi::GetExtendedTcpTable(
+                    buf.as_mut_ptr() as *mut std::ffi::c_void,
+                    &mut size,
+                    0,
+                    winffi::AF_INET,
+                    winffi::TCP_TABLE_OWNER_PID_ALL,
+                    0,
+                );
+            }
+            if rc != winffi::NO_ERROR {
+                return 0;
+            }
+            let n = *(buf.as_ptr() as *const u32) as usize;
+            let row_sz = std::mem::size_of::<winffi::TcpRowOwnerPid>();
+            let max = (size as usize).saturating_sub(4) / row_sz;
+            let rows = buf.as_ptr().add(4) as *const winffi::TcpRowOwnerPid;
+            (0..n.min(max))
+                .filter(|&i| (*rows.add(i)).owning_pid == pid)
+                .count() as u32
+        }
     }
 
     /// Job Object yoksa fallback: kök + tüm torunlara `TerminateProcess`
@@ -159,6 +217,7 @@ mod inner {
                 }
                 winffi::CloseHandle(h);
             }
+            m.net_tcp = net_tcp_for(pid);
             Ok(m)
         }
 
@@ -198,6 +257,11 @@ pub use inner::{cpu_centis, kill_tree, WindowsInspector};
 mod stub {
     use super::super::{Metrics, ProcessInspector, TreeNode};
     pub struct WindowsInspector;
+    impl Default for WindowsInspector {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
     impl WindowsInspector {
         pub fn new() -> Self {
             Self
@@ -224,3 +288,29 @@ mod stub {
 
 #[cfg(not(target_os = "windows"))]
 pub use stub::WindowsInspector;
+
+#[cfg(all(test, target_os = "windows"))]
+mod tests {
+    use super::inner::net_tcp_for;
+
+    #[test]
+    fn loopback_tcp_counted_for_self() {
+        let me = std::process::id();
+        let before = net_tcp_for(me);
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = listener.local_addr().expect("addr").port();
+        let connector = std::thread::spawn(move || {
+            std::net::TcpStream::connect(("127.0.0.1", port)).expect("connect")
+        });
+        let (srv, cli) = (
+            listener.accept().expect("accept"),
+            connector.join().expect("join"),
+        );
+        let after = net_tcp_for(me);
+        // Listener + accepted + connected: en az 3 yeni satır bizim pid'e.
+        assert!(after >= before + 3, "before={} after={}", before, after);
+        let _ = (srv, cli);
+        // Olmayan pid: panik yok, 0 satır.
+        assert_eq!(net_tcp_for(u32::MAX), 0);
+    }
+}
