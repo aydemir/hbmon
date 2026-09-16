@@ -214,8 +214,14 @@
     "status": "done",
     "priority": "P3",
     "environment": "both",
-    "labels": ["daemon", "refactor", "readability"],
-    "depends_on": ["TASK-011"],
+    "labels": [
+      "daemon",
+      "refactor",
+      "readability"
+    ],
+    "depends_on": [
+      "TASK-011"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-014-daemon-dispatch-split.md"
@@ -226,8 +232,14 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["ipc", "wait", "protocol"],
-    "depends_on": ["TASK-005"],
+    "labels": [
+      "ipc",
+      "wait",
+      "protocol"
+    ],
+    "depends_on": [
+      "TASK-005"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-015-wait-until-normalize.md"
@@ -238,7 +250,11 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["ipc", "status", "context-economy"],
+    "labels": [
+      "ipc",
+      "status",
+      "context-economy"
+    ],
     "depends_on": [],
     "created": "2026-09-13",
     "updated": "2026-09-13",
@@ -250,7 +266,11 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["cli", "operability", "discovery"],
+    "labels": [
+      "cli",
+      "operability",
+      "discovery"
+    ],
     "depends_on": [],
     "created": "2026-09-13",
     "updated": "2026-09-13",
@@ -262,7 +282,11 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["daemon", "health", "perf"],
+    "labels": [
+      "daemon",
+      "health",
+      "perf"
+    ],
     "depends_on": [],
     "created": "2026-09-13",
     "updated": "2026-09-13",
@@ -274,8 +298,15 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["docs", "deps", "rfc", "ci"],
-    "depends_on": ["TASK-008"],
+    "labels": [
+      "docs",
+      "deps",
+      "rfc",
+      "ci"
+    ],
+    "depends_on": [
+      "TASK-008"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-019-drift-size-gates.md"
@@ -286,8 +317,13 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["release", "distribution"],
-    "depends_on": ["TASK-002"],
+    "labels": [
+      "release",
+      "distribution"
+    ],
+    "depends_on": [
+      "TASK-002"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-020-release-prep.md"
@@ -298,8 +334,15 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["daemon", "dep-missing", "flake", "race"],
-    "depends_on": ["TASK-009"],
+    "labels": [
+      "daemon",
+      "dep-missing",
+      "flake",
+      "race"
+    ],
+    "depends_on": [
+      "TASK-009"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-021-dep-offset-race.md"
@@ -310,7 +353,12 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["cli", "operability", "gc", "correctness"],
+    "labels": [
+      "cli",
+      "operability",
+      "gc",
+      "correctness"
+    ],
     "depends_on": [],
     "created": "2026-09-13",
     "updated": "2026-09-13",
@@ -322,7 +370,11 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["cli", "context-economy", "operability"],
+    "labels": [
+      "cli",
+      "context-economy",
+      "operability"
+    ],
     "depends_on": [],
     "created": "2026-09-13",
     "updated": "2026-09-13",
@@ -334,8 +386,14 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["daemon", "robustness", "disk"],
-    "depends_on": ["TASK-009"],
+    "labels": [
+      "daemon",
+      "robustness",
+      "disk"
+    ],
+    "depends_on": [
+      "TASK-009"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-024-log-cap.md"
@@ -346,8 +404,13 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["health", "dep-missing"],
-    "depends_on": ["TASK-001"],
+    "labels": [
+      "health",
+      "dep-missing"
+    ],
+    "depends_on": [
+      "TASK-001"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-025-dep-patterns.md"
@@ -358,8 +421,15 @@
     "status": "done",
     "priority": "P3",
     "environment": "both",
-    "labels": ["docs", "agents"],
-    "depends_on": ["TASK-015", "TASK-016", "TASK-017"],
+    "labels": [
+      "docs",
+      "agents"
+    ],
+    "depends_on": [
+      "TASK-015",
+      "TASK-016",
+      "TASK-017"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-026-readme-agents.md"
@@ -370,7 +440,11 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["security", "uuid", "contract"],
+    "labels": [
+      "security",
+      "uuid",
+      "contract"
+    ],
     "depends_on": [],
     "created": "2026-09-13",
     "updated": "2026-09-13",
@@ -382,8 +456,14 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["contract", "context-economy", "tests"],
-    "depends_on": ["TASK-027"],
+    "labels": [
+      "contract",
+      "context-economy",
+      "tests"
+    ],
+    "depends_on": [
+      "TASK-027"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-028-contract-lock.md"
@@ -394,8 +474,14 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["cli", "context-economy", "operability"],
-    "depends_on": ["TASK-028"],
+    "labels": [
+      "cli",
+      "context-economy",
+      "operability"
+    ],
+    "depends_on": [
+      "TASK-028"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-029-log-list-filters.md"
@@ -406,8 +492,14 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["release", "packaging", "docs"],
-    "depends_on": ["TASK-002"],
+    "labels": [
+      "release",
+      "packaging",
+      "docs"
+    ],
+    "depends_on": [
+      "TASK-002"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-030-crate-hygiene.md"
@@ -418,8 +510,14 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["docs", "rfc", "drift"],
-    "depends_on": ["TASK-030"],
+    "labels": [
+      "docs",
+      "rfc",
+      "drift"
+    ],
+    "depends_on": [
+      "TASK-030"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-031-rfc-refresh.md"
@@ -430,8 +528,15 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["docs", "contract", "agents"],
-    "depends_on": ["TASK-028", "TASK-031"],
+    "labels": [
+      "docs",
+      "contract",
+      "agents"
+    ],
+    "depends_on": [
+      "TASK-028",
+      "TASK-031"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-032-stability-matrix.md"
@@ -442,8 +547,14 @@
     "status": "done",
     "priority": "P1",
     "environment": "both",
-    "labels": ["release", "distribution"],
-    "depends_on": ["TASK-002", "TASK-030"],
+    "labels": [
+      "release",
+      "distribution"
+    ],
+    "depends_on": [
+      "TASK-002",
+      "TASK-030"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-033-crates-publish.md"
@@ -454,8 +565,14 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["tests", "operability", "docs"],
-    "depends_on": ["TASK-022"],
+    "labels": [
+      "tests",
+      "operability",
+      "docs"
+    ],
+    "depends_on": [
+      "TASK-022"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-034-smoke-stale-policy.md"
@@ -466,8 +583,15 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["docs", "rfc", "i18n"],
-    "depends_on": ["TASK-031", "TASK-032"],
+    "labels": [
+      "docs",
+      "rfc",
+      "i18n"
+    ],
+    "depends_on": [
+      "TASK-031",
+      "TASK-032"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-035-rfc-english-translation.md"
@@ -478,8 +602,14 @@
     "status": "done",
     "priority": "P2",
     "environment": "both",
-    "labels": ["docs", "agents", "harness"],
-    "depends_on": ["TASK-032"],
+    "labels": [
+      "docs",
+      "agents",
+      "harness"
+    ],
+    "depends_on": [
+      "TASK-032"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-036-usage-patterns.md"
@@ -490,8 +620,14 @@
     "status": "done",
     "priority": "P3",
     "environment": "both",
-    "labels": ["docs", "operability", "github"],
-    "depends_on": ["TASK-032"],
+    "labels": [
+      "docs",
+      "operability",
+      "github"
+    ],
+    "depends_on": [
+      "TASK-032"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-037-issue-templates.md"
@@ -502,8 +638,14 @@
     "status": "done",
     "priority": "P3",
     "environment": "both",
-    "labels": ["docs", "agents", "harness"],
-    "depends_on": ["TASK-036"],
+    "labels": [
+      "docs",
+      "agents",
+      "harness"
+    ],
+    "depends_on": [
+      "TASK-036"
+    ],
     "created": "2026-09-13",
     "updated": "2026-09-13",
     "file": "tasks/done/TASK-038-example-skill.md"
@@ -514,8 +656,14 @@
     "status": "done",
     "priority": "P1",
     "environment": "windows",
-    "labels": ["windows", "clippy", "hygiene"],
-    "depends_on": ["TASK-006"],
+    "labels": [
+      "windows",
+      "clippy",
+      "hygiene"
+    ],
+    "depends_on": [
+      "TASK-006"
+    ],
     "created": "2026-09-14",
     "updated": "2026-09-14",
     "file": "tasks/done/TASK-039-windows-clippy.md"
@@ -526,8 +674,15 @@
     "status": "done",
     "priority": "P1",
     "environment": "windows",
-    "labels": ["windows", "cli", "gc", "correctness"],
-    "depends_on": ["TASK-022"],
+    "labels": [
+      "windows",
+      "cli",
+      "gc",
+      "correctness"
+    ],
+    "depends_on": [
+      "TASK-022"
+    ],
     "created": "2026-09-14",
     "updated": "2026-09-14",
     "file": "tasks/done/TASK-040-cleanup-windows-guard.md"
@@ -538,8 +693,15 @@
     "status": "done",
     "priority": "P2",
     "environment": "windows",
-    "labels": ["windows", "security", "ipc"],
-    "depends_on": ["TASK-006", "TASK-034"],
+    "labels": [
+      "windows",
+      "security",
+      "ipc"
+    ],
+    "depends_on": [
+      "TASK-006",
+      "TASK-034"
+    ],
     "created": "2026-09-14",
     "updated": "2026-09-14",
     "file": "tasks/done/TASK-041-pipe-acl.md"
@@ -550,8 +712,14 @@
     "status": "done",
     "priority": "P2",
     "environment": "windows",
-    "labels": ["windows", "daemon", "signals"],
-    "depends_on": ["TASK-006"],
+    "labels": [
+      "windows",
+      "daemon",
+      "signals"
+    ],
+    "depends_on": [
+      "TASK-006"
+    ],
     "created": "2026-09-14",
     "updated": "2026-09-14",
     "file": "tasks/done/TASK-042-graceful-term-probe.md"
@@ -562,8 +730,14 @@
     "status": "done",
     "priority": "P3",
     "environment": "windows",
-    "labels": ["windows", "metrics", "research"],
-    "depends_on": ["TASK-006"],
+    "labels": [
+      "windows",
+      "metrics",
+      "research"
+    ],
+    "depends_on": [
+      "TASK-006"
+    ],
     "created": "2026-09-14",
     "updated": "2026-09-14",
     "file": "tasks/done/TASK-043-windows-net-count.md"
@@ -574,8 +748,13 @@
     "status": "done",
     "priority": "P2",
     "environment": "windows",
-    "labels": ["windows", "tests"],
-    "depends_on": ["TASK-006"],
+    "labels": [
+      "windows",
+      "tests"
+    ],
+    "depends_on": [
+      "TASK-006"
+    ],
     "created": "2026-09-14",
     "updated": "2026-09-14",
     "file": "tasks/done/TASK-044-windows-test-debt.md"
@@ -586,10 +765,35 @@
     "status": "done",
     "priority": "P3",
     "environment": "both",
-    "labels": ["docs", "hygiene"],
-    "depends_on": ["TASK-006"],
+    "labels": [
+      "docs",
+      "hygiene"
+    ],
+    "depends_on": [
+      "TASK-006"
+    ],
     "created": "2026-09-14",
     "updated": "2026-09-14",
     "file": "tasks/done/TASK-045-doc-drift.md"
+  },
+  {
+    "id": "TASK-046",
+    "title": "hbmon events: istemci-taraflı olay akışı",
+    "status": "done",
+    "priority": "P2",
+    "environment": "both",
+    "labels": [
+      "cli",
+      "events",
+      "experiment",
+      "sidecar"
+    ],
+    "depends_on": [
+      "TASK-013",
+      "TASK-023"
+    ],
+    "created": "2026-09-16",
+    "updated": "2026-09-16",
+    "file": "tasks/done/TASK-046-events-stream.md"
   }
 ]

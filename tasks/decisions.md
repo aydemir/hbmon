@@ -95,3 +95,27 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
 - Kapatılan: `net_tcp` — `GetExtendedTcpTable` (iphlpapi, ham FFI)
   ile sahip-pid sayımı eklendi; `net_udp` 0 kalır (sahip-eşlemeli
   UDP tablosu yok). README/RFC satırları güncellendi.
+
+## 2026-09-16 — hbmon events: push çekirdeğe girmedi (TASK-046)
+
+- Kilit "pull-tabanlı" diyor; server-side `subscribe`/kalıcı bağlantı kilidi
+  delerdi → push ihtiyacı çekirdeğe değil CLI'ya verildi: `hbmon events`
+  yalnızca `log_tail` + `status --compact` pull'ları stdout akışına çevirir
+  (`IPC_OPS` değişmedi, drift yeşil). Ajan komutu arka planda çalıştırınca
+  olaylar ona push edilmiş gibi düşer — TASK-013 hükmü (pull + olay-bazı
+  sidecar) yerleşik komuta dönüştü.
+- Deney kuralı: kayıp > tekrar — kuyruk penceresi dışına düşen satırda
+  akış baştan basar (çift satır tolere, kayıp yok).
+- Server-side gerçek push (`subscribe` op) bilinçli olarak yapılmadı;
+  ihtiyaç kanıtlanırsa ayrı karar + RFC değişikliği gerekir.
+
+## 2026-09-16 — TASK-046 2./3. göz incelemesi
+
+- 2. göz: `stream_start` "son satırı bul" mantığı, saniye-çözünürlüklü `ts`
+  yüzünden bayt-aynı komşu satırda kayıp üretebilirdi → `StreamPos`
+  (son satır + bitişik blok sayacı) ile kapatıldı; karar "kayıp yok"tan
+  "tekrar > kayıp + bitişik tekrar korunur"a daraltıldı. Ölü soket
+  (`shutdown` sonrası dahil) exit 3'e kilitlendi.
+- 3. göz: RFC TR/EN komut enumerasyonları + USAGE-PATTERNS `events`'siz
+  kalmıştı → güncellendi (EN ağaç satırı bayt-aynı). Yeni IPC op yok,
+  `IPC_OPS`/drift yeşil, kilit ("pull-tabanlı") bozulmadı.

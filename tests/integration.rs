@@ -922,3 +922,127 @@ fn log_event_filter_returns_matching_subset() {
         .output()
         .unwrap();
 }
+
+/// TASK-046: `events` akışı `exit` olayını basar ve build koduyla çıkar.
+/// Daemon'a dokunmaz (istemci-taraflı log_tail takibi) — kilit korunur.
+#[test]
+fn events_streams_exit_and_returns_build_code() {
+    let id = uuid("events");
+    let s = sock_for(&id);
+    let out = hbmon()
+        .args(watch_args(&id, sleep_cmd(2)))
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+
+    let e = hbmon()
+        .args(["events", "--sock", &s, "--timeout", "30"])
+        .timeout(Duration::from_secs(60))
+        .output()
+        .unwrap();
+    assert!(e.status.success(), "events exit 0 bekler: {:?}", e.status);
+    let text = String::from_utf8_lossy(&e.stdout);
+    let mut saw_exit = false;
+    for line in text.lines() {
+        let ev: Value = serde_json::from_str(line).expect("satır JSON olmalı");
+        assert_eq!(ev["uuid"], id.as_str());
+        if ev["ev"] == "exit" {
+            saw_exit = true;
+            assert_eq!(ev["code"], 0);
+        }
+    }
+    assert!(saw_exit, "akışta exit olayı olmalı:\n{}", text);
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}
+
+/// TASK-046: `--event` filtresi eşleşmeyeni basmaz; `--tail` replay yapar.
+#[test]
+fn events_filter_and_replay() {
+    let id = uuid("events-filter");
+    let s = sock_for(&id);
+    let out = hbmon()
+        .args(watch_args(&id, sleep_cmd(2)))
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+
+    let e = hbmon()
+        .args([
+            "events",
+            "--sock",
+            &s,
+            "--timeout",
+            "30",
+            "--event",
+            "exit",
+            "--tail",
+            "5",
+        ])
+        .timeout(Duration::from_secs(60))
+        .output()
+        .unwrap();
+    assert!(e.status.success());
+    let text = String::from_utf8_lossy(&e.stdout);
+    assert!(!text.trim().is_empty(), "replay+akış boş olmamalı");
+    for line in text.lines() {
+        let ev: Value = serde_json::from_str(line).expect("satır JSON olmalı");
+        assert_eq!(ev["ev"], "exit", "filtre dışı satır: {}", line);
+    }
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}
+
+/// TASK-046: daemon bitmeden süre dolarsa exit 124 (wait ile aynı dil).
+#[test]
+fn events_timeout_exits_124() {
+    let id = uuid("events-timeout");
+    let s = sock_for(&id);
+    let out = hbmon()
+        .args(watch_args(&id, sleep_cmd(60)))
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+
+    let e = hbmon()
+        .args(["events", "--sock", &s, "--timeout", "2"])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert_eq!(e.status.code(), Some(124));
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}
+
+/// TASK-046 (2. göz): ölü sokette akış kurulamaz → exit 3 (internal).
+/// `shutdown` ile giden daemon da aynı yola düşer (bağlantı yok).
+#[test]
+fn events_dead_sock_exits_internal() {
+    let e = hbmon()
+        .args([
+            "events",
+            "--sock",
+            "/tmp/hbmon-itest-dead-sock-xyz.sock",
+            "--timeout",
+            "5",
+        ])
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert_eq!(e.status.code(), Some(3));
+}

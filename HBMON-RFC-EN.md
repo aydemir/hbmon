@@ -734,7 +734,7 @@ hbmon/
 ├── src/
 │   ├── main.rs              ← CLI entry (clap derive)
 │   ├── lib.rs               ← kütüphane re-exports
-│   ├── cli/                 ← watch, status, wait, exec, kill, shutdown
+│   ├── cli/                 ← watch, status, wait, events, exec, kill, shutdown
 │   ├── daemon/              ← daemonize, lifecycle, pidfile, signals
 │   ├── ipc/                 ← UDS server, JSON-RPC dispatcher, codec
 │   ├── proc/                ← ProcessInspector trait + Linux/macOS impl
@@ -870,9 +870,9 @@ Required minimum: **shell command + file read.** Both exist in all modern harnes
 - [x] Full Linux monitoring + macOS process supervision
 - [x] Daemonization, UDS JSON-RPC, JSONL, exit mapping
 - [x] Stall/OOM/dep-missing/timeout (ETA to come — `eta_sec` not returned in v1)
-- [x] CLI: watch, status, wait, exec, kill, shutdown, cleanup, list, log
+- [x] CLI: watch, status, wait, exec, kill, shutdown, cleanup, list, log, events
   (+`status --compact`, `wait --until` vocabulary, `cleanup --dir`, `watch --max-log-mb`,
-  `log --event`, `list --state`/`--live-only` — TASK-005/016/017/023/024/029)
+  `log --event`, `list --state`/`--live-only`, `events` stream — TASK-005/016/017/023/024/029/046)
 - [x] ~70 unit + 14 integration (+2 sandbox-ignore) + 3 drift tests
   (2026-09-13, `cargo test --locked -j2` green; contract lock TASK-028)
 

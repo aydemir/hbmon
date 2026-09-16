@@ -59,3 +59,4 @@
 | TASK-043 | Windows net sayımı (GetTcpTable) + cmdline/OOM araştırma | done | P3 |
 | TASK-044 | Windows test borcu (paths unit + ignored + boyut notu) | done | P2 |
 | TASK-045 | Milestone-dili doc drift temizliği | done | P3 |
+| TASK-046 | hbmon events (istemci-taraflı olay akışı) | done | P2 |

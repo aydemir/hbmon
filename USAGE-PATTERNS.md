@@ -42,7 +42,7 @@ description: Monitor long builds in the background (watch/status/wait/exec).
 ---
 # hbmon
 1. `watch --detach -- <cmd>` → stdout line 1 = `{v,ev:"ready",uuid,sock,log}`.
-2. Poll: `status --compact`. Block: `wait --until <signals>`.
+2. Poll: `status --compact`. Block: `wait --until <signals>`. Stream: `events --event exit,dep_missing &` (push hissi; çekirdek hâlâ pull).
 3. Exit: 0 done / 1 failed / 2 dep-missing (install+retry) / 124 / 137 / 3.
 4. `exec` is ephemeral: NO status/wait. `stall_suspect` → confirm then kill;
    `oom_suspect` → don't retry, reduce memory; stale socket → re-watch.

@@ -1,3 +1,4 @@
+pub mod events;
 pub mod exec;
 pub mod kill;
 pub mod list;
@@ -28,6 +29,8 @@ pub enum Commands {
     Status(status::StatusArgs),
     /// Block until build finishes (UDS wait)
     Wait(wait::WaitArgs),
+    /// Stream monitor events to stdout (client-side follow over log_tail)
+    Events(events::EventsArgs),
     /// Run build in foreground with handshake on stdout line 1
     Exec(exec::ExecArgs),
     /// Kill the build process group (UDS or pid)
@@ -58,6 +61,7 @@ pub fn dispatch(cli: Cli) -> Result<i32, String> {
         Commands::Watch(a) => watch::run(a),
         Commands::Status(a) => status::run(a),
         Commands::Wait(a) => wait::run(a),
+        Commands::Events(a) => events::run(a),
         Commands::Exec(a) => exec::run(a),
         Commands::Kill(a) => kill::run(a),
         Commands::Shutdown(a) => shutdown::run(a),
