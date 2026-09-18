@@ -375,6 +375,13 @@ field; no polling or harness plugin is needed. An unknown signal name
 yields an `INVALID_UNTIL` error (no silent ignoring). This is synchronous
 multiplexed waiting, not async push (without `until`, it returns only on terminal
 states).
+
+> Note (v1 outcome, TASK-047): a terminal state (`done`/`failed`/
+> `dep_missing`/`timeout`/`oom_killed`) returns even when not listed;
+> `woke_on` carries the canonical signal name (`oom_suspect` for OOM).
+> Waiting for an "early signal" on a finished build was a deadline/linger
+> trap: 124 before the timeout, and exit 3 once the linger (60 s) ended
+> and the daemon withdrew.
 ##### Operation: `kill`
 
 ```json
@@ -500,6 +507,13 @@ Then the build output follows.
 > Note (v1 outcome, TASK-007): `exec` is ephemeral — `sock`/`log` in the handshake
 > are reserved names, no files are created; `status`/`wait` are not attempted.
 > The handshake carries `"ephemeral":true` + `"note"`.
+
+> Note (v1 outcome, TASK-047): `exec --timeout-sec N` has a watchdog
+> (TERM → 5 s grace → KILL, exit 124; `0`/absent = off, the direct child
+> is killed — use `watch` for the group). Dependency scanning in `exec`
+> covers both stdout and stderr (TASK-048/S3b, parity with `watch`);
+> `watch` scans both streams via `.out` — this difference is
+> documented in `PROTOCOL.md`.
 
 ### 6.2 Which Should Be Preferred?
 
@@ -873,8 +887,8 @@ Required minimum: **shell command + file read.** Both exist in all modern harnes
 - [x] CLI: watch, status, wait, exec, kill, shutdown, cleanup, list, log, events
   (+`status --compact`, `wait --until` vocabulary, `cleanup --dir`, `watch --max-log-mb`,
   `log --event`, `list --state`/`--live-only`, `events` stream — TASK-005/016/017/023/024/029/046)
-- [x] ~70 unit + 14 integration (+2 sandbox-ignore) + 3 drift tests
-  (2026-09-13, `cargo test --locked -j2` green; contract lock TASK-028)
+- [x] 92 unit + 21 integration (+2 sandbox-ignore) + 3 drift + 1 smoke tests
+  (2026-09-18, `cargo test --locked -j2` green; contract lock TASK-028)
 
 ### 14.2 v1.5
 

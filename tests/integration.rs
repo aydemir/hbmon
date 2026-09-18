@@ -1046,3 +1046,115 @@ fn events_dead_sock_exits_internal() {
         .unwrap();
     assert_eq!(e.status.code(), Some(3));
 }
+
+/// TASK-047/S2: build BITMİŞKEN `--until stall_suspect` verilirse wait
+/// deadline/linger beklemez — terminal state (done) dürüstçe döner.
+/// Önceden: timeout < linger → 124; timeout > linger → daemon çekilir,
+/// istemci exit 3 alırdı.
+#[test]
+fn wait_until_terminal_not_listed_returns_state() {
+    let id = uuid("until-terminal");
+    let s = sock_for(&id);
+    let out = hbmon()
+        .args(watch_args(&id, sleep_cmd(1)))
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+    // Build'in bitmesini + exit olayının günlüğe düşmesini bekle.
+    std::thread::sleep(Duration::from_millis(1500));
+
+    let start = std::time::Instant::now();
+    let w = hbmon()
+        .args([
+            "wait",
+            "--sock",
+            &s,
+            "--timeout",
+            "120",
+            "--until",
+            "stall_suspect",
+        ])
+        .timeout(Duration::from_secs(150))
+        .output()
+        .unwrap();
+    let el = start.elapsed().as_secs();
+    assert!(
+        w.status.success(),
+        "terminal dönüş exit 0 olmalı: {:?}",
+        w.status
+    );
+    let wv: Value = serde_json::from_slice(&w.stdout).unwrap();
+    assert_eq!(wv["state"], "done");
+    assert_eq!(wv["woke_on"], "done", "kanonik terminal ad");
+    assert_eq!(wv["code"], 0);
+    assert!(el < 30, "linger beklenmemeliydi: {}s", el);
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}
+
+/// TASK-047/S3a: `exec --timeout-sec` watchdog — TERM → grace → KILL,
+/// exit 124 (önceden bayrak sessizce yok sayılıyordu: 120s'lik uyku
+/// 120s sürüyordu).
+#[test]
+fn exec_timeout_exits_124() {
+    let mut a = vec![
+        "exec".to_string(),
+        "--timeout-sec".to_string(),
+        "2".to_string(),
+        "--".to_string(),
+    ];
+    a.extend(sleep_cmd(120));
+    let start = std::time::Instant::now();
+    let out = hbmon()
+        .args(a)
+        .timeout(Duration::from_secs(90))
+        .output()
+        .unwrap();
+    assert_eq!(out.status.code(), Some(124), "watchdog 124 vermeli");
+    assert!(
+        start.elapsed().as_secs() < 30,
+        "erken kesilmeliydi: {:?}",
+        start.elapsed()
+    );
+}
+
+/// TASK-047/S1: `--sock` socket olmayan var olan yolu gösteriyorsa
+/// silinmez — "ready" handshake'i de basılmaz, exit 3.
+#[cfg(unix)]
+#[test]
+fn watch_refuses_to_remove_non_socket_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("hbmon-userdata.sock");
+    std::fs::write(&p, b"important user data").unwrap();
+    let mut a = vec![
+        "watch".to_string(),
+        "--detach".to_string(),
+        "--sock".to_string(),
+        p.to_string_lossy().to_string(),
+        "--".to_string(),
+    ];
+    a.extend(sleep_cmd(5));
+    let out = hbmon()
+        .args(a)
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert_eq!(
+        out.status.code(),
+        Some(3),
+        "socket-olmayan yol reddedilmeli"
+    );
+    assert!(
+        out.stdout.is_empty(),
+        "handshake basılmamalı: {:?}",
+        out.stdout
+    );
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("non-socket"), "stderr: {}", err);
+    assert_eq!(std::fs::read(&p).unwrap(), b"important user data");
+}

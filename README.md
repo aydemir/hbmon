@@ -53,6 +53,7 @@ hbmon wait --sock /tmp/hbmon-<uuid>.sock --timeout 600
 # no status/wait, no sock/log files created on exit)
 hbmon exec -- make -j8   # exit: 0 ok, 1 fail, 2 dep-missing
 hbmon exec --format json -- make -j8  # last stderr line: JSON summary
+hbmon exec --timeout-sec 600 -- make -j8  # watchdog: exit 124 (0 = off)
 
 # Kill / shut down
 hbmon kill --sock ... --signal TERM
@@ -71,6 +72,8 @@ This section is for LLM agents; the full contract is in [HBMON-RFC-EN.md](HBMON-
 2. Poll: `hbmon status --sock $SOCK` (cheap probe: `--compact`), or block:
    `hbmon wait --sock $SOCK --until done,failed,dep_missing,timeout,stall_suspect,oom_suspect`
    (aliases: `stalled`, `oom_killed`; unknown name → `INVALID_UNTIL`, exit 3).
+   A terminal state returns even when it is not listed (`woke_on` = canonical
+   name) — a finished build never waits out the daemon linger.
 3. Exit: `0 done / 1 failed / 2 dep-missing / 124 timeout / 137 oom / 3 internal error`.
    On `2`, install the missing package + retry.
 4. `exec` is ephemeral: `sock`/`log` in the handshake are reserved names, no files
@@ -102,6 +105,17 @@ stall_suspect oom_suspect`, aliases `stalled oom_killed`),
 shutdown`). Experimental (may change): metric fields, stall
 thresholds/scores, `metrics`/`log_tail` output details. Locked by
 `tests/drift.rs`.
+
+TASK-047 (additive, locked by tests): `wait --until` returns a terminal state
+even when it is not listed (`woke_on` = canonical name; OOM → `oom_suspect`),
+`exec --timeout-sec` maps to `124` (TERM → 5 s grace → KILL; `0` = off), a
+non-socket path passed to `--sock` is refused instead of being deleted,
+and `exec` scans both stdout and stderr for dep-missing patterns (parity
+with `watch`).
+TASK-048 (additive, locked by tests): `kill`/`shutdown`/`cleanup` return
+exit 1 on failure (`killed:false` / `ok_shutdown:false` / `failed>0`),
+`wait --poll-ms` is clamped to 50 ms server-side, and foreground `watch`
+exits immediately on build end (no linger).
 
 ## Status
 

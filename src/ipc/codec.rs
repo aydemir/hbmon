@@ -9,9 +9,14 @@ use std::io::{BufRead, Write};
 
 pub fn read_message(reader: &mut impl BufRead) -> Result<Value, String> {
     let mut line = String::new();
-    reader
+    let n = reader
         .read_line(&mut line)
         .map_err(|e| format!("ipc read: {}", e))?;
+    if n == 0 {
+        // EOF: karşı taraf kapandı (örn. daemon linger sonunda çekildi).
+        // "empty request" demek teşhisi yanıltıyordu (TASK-047/S4c).
+        return Err("connection closed".to_string());
+    }
     if line.trim().is_empty() {
         return Err("empty request".to_string());
     }
@@ -45,7 +50,16 @@ mod tests {
     #[test]
     fn empty_line_is_error() {
         let mut reader = BufReader::new(b"\n".as_slice());
-        assert!(read_message(&mut reader).is_err());
+        let err = read_message(&mut reader).unwrap_err();
+        assert_eq!(err, "empty request");
+    }
+
+    /// TASK-047/S4c: EOF ("daemon çekildi") ayrı ve dürüst mesaj verir.
+    #[test]
+    fn eof_is_connection_closed() {
+        let mut reader = BufReader::new(b"".as_slice());
+        let err = read_message(&mut reader).unwrap_err();
+        assert_eq!(err, "connection closed");
     }
 
     #[test]

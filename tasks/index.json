@@ -795,5 +795,43 @@
     "created": "2026-09-16",
     "updated": "2026-09-16",
     "file": "tasks/done/TASK-046-events-stream.md"
+  },
+  {
+    "id": "TASK-047",
+    "title": "2./3. göz inceleme kaydı + P1 düzeltmeleri (sock guard, wait terminal, exec timeout)",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": [
+      "review",
+      "safety",
+      "cli",
+      "correctness",
+      "daemon"
+    ],
+    "depends_on": [],
+    "created": "2026-09-18",
+    "updated": "2026-09-18",
+    "file": "tasks/done/TASK-047-review-2-3-goz-p1.md"
+  },
+  {
+    "id": "TASK-048",
+    "title": "TASK-047 incelemesinin kalan bulguları (exec stdout, watchdog UX, log_tail belleği, exit kodları, ölü kod)",
+    "status": "done",
+    "priority": "P1",
+    "environment": "both",
+    "labels": [
+      "review",
+      "correctness",
+      "perf",
+      "cli",
+      "hygiene"
+    ],
+    "depends_on": [
+      "TASK-047"
+    ],
+    "created": "2026-09-18",
+    "updated": "2026-09-18",
+    "file": "tasks/done/TASK-048-review-kalan-bulgular.md"
   }
 ]

@@ -41,6 +41,7 @@ pub struct MonitorConfig {
     pub cmd: Vec<String>,
     pub timeout_sec: Option<u64>,
     pub label: Option<String>,
+    pub parent_pid: Option<u32>,
     pub workdir: PathBuf,
     /// `.out` üst sınırı bayt (TASK-024, opt-in; None = sınırsız).
     pub max_log_bytes: Option<u64>,
@@ -54,6 +55,7 @@ impl MonitorConfig {
         cmd: Vec<String>,
         timeout_sec: Option<u64>,
         label: Option<String>,
+        parent_pid: Option<u32>,
     ) -> Self {
         let sock = sock
             .map(paths::from_explicit)
@@ -73,6 +75,7 @@ impl MonitorConfig {
             cmd,
             timeout_sec,
             label,
+            parent_pid,
             workdir,
             max_log_bytes: None,
         }
@@ -82,25 +85,24 @@ impl MonitorConfig {
 /// Public entry from CLI: optionally daemonize, then run monitor.
 pub fn spawn_watch(cfg: MonitorConfig, detach: bool) -> Result<MonitorConfig, String> {
     if paths::sock_exists(&cfg.sock) {
-        // live monitor? refuse double-spawn (RFC 13.2.1); stale socket? remove
         if crate::ipc::can_connect(&cfg.sock) {
             return Err(format!(
                 "MONITOR_ALREADY_EXISTS: {} is live; use a fresh --uuid",
                 paths::sock_display(&cfg.sock)
             ));
         } else {
-            paths::sock_remove(&cfg.sock);
+            paths::sock_remove_stale(&cfg.sock)?;
         }
     }
     if !detach {
-        run_daemon(cfg.clone())?;
+        // foreground: no linger — build end = process end (S3c).
+        run_daemon(cfg.clone(), false)?;
         return Ok(cfg);
     }
+    // detach: double-fork, then run daemon in child with 60s linger (TASK-047/S2).
     crate::platform::detach::detach(&cfg.uuid)?;
-    match run_daemon(cfg.clone()) {
-        Ok(_) => std::process::exit(0),
-        Err(_) => std::process::exit(3),
-    }
+    run_daemon(cfg, true)?;
+    std::process::exit(0)
 }
 
 /// Mutable per-tick state (TASK-011: extracted from `run_daemon`).
@@ -465,7 +467,7 @@ fn poll_once(ctx: &mut PollCtx, st: &mut Poll) -> bool {
     false
 }
 
-pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
+pub fn run_daemon(cfg: MonitorConfig, linger: bool) -> Result<(), String> {
     let logger = EventLogger::create(&cfg.log)?;
     let insp = inspector();
     let started_iso = now_iso();
@@ -519,6 +521,8 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         build_code: Mutex::new(None),
         exit_secs: Mutex::new(None),
         root_pid: Mutex::new(Some(child_pid)),
+        parent_pid: Mutex::new(cfg.parent_pid),
+        label: Mutex::new(cfg.label.clone()),
         dep_info: Mutex::new(None),
         oom_info: Mutex::new(None),
         stall_threshold: Mutex::new(30.0),
@@ -538,6 +542,8 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
             ("sock", json!(paths::sock_display(&cfg.sock))),
             ("log", json!(cfg.log.to_string_lossy())),
             ("root_pid", json!(child_pid)),
+            ("parent_pid", json!(cfg.parent_pid)),
+            ("label", json!(cfg.label)),
             ("cmd", json!(root_cmd)),
             ("workdir", json!(cfg.workdir.to_string_lossy())),
         ]),
@@ -575,12 +581,14 @@ pub fn run_daemon(cfg: MonitorConfig) -> Result<(), String> {
         }
     }
 
-    let linger_until = Instant::now() + Duration::from_secs(60);
-    while Instant::now() < linger_until {
-        if *shared.shutdown.lock().unwrap() {
-            break;
+    if linger {
+        let linger_until = Instant::now() + Duration::from_secs(60);
+        while Instant::now() < linger_until {
+            if *shared.shutdown.lock().unwrap() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(500));
         }
-        std::thread::sleep(Duration::from_millis(500));
     }
     pidfile::remove(&cfg.pidfile);
     paths::sock_remove(&cfg.sock);

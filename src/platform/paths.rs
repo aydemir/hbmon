@@ -176,6 +176,53 @@ pub fn sock_remove(a: &SockAddr) {
     }
 }
 
+/// Var olan yol bir socket dosyası DEĞİLSE hata metni (TASK-047/S1).
+/// `spawn_watch` bayat-socket temizliği eskiden koşulsuz `remove_file`
+/// çağırıyordu: `--sock /tmp/veri.txt` gibi bir yazım hatası kullanıcı
+/// dosyasını sessizce siliyordu. Symlink de socket sayılmaz (RFC 13.2.1:
+/// symlink açılışta reddedilir) → korunur. Yolun YOK olması normaldir
+/// (ilk spawn) ve çakışma sayılmaz. Windows: dosya semantiği yok.
+pub fn sock_non_socket(a: &SockAddr) -> Option<String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileTypeExt;
+        match std::fs::symlink_metadata(a) {
+            Ok(m) if !m.file_type().is_socket() => Some(format!(
+                "refusing to use non-socket path: {} (pass a fresh --sock)",
+                a.display()
+            )),
+            _ => None,
+        }
+    }
+    #[cfg(windows)]
+    {
+        let _ = a;
+        None
+    }
+}
+
+/// Bayat socket temizliği — yalnız gerçek socket dosyası için. Socket
+/// olmayan yolda `Err` (veri kaybı koruması, TASK-047/S1); daemon'un
+/// kendi çıkış temizliği `sock_remove` ile ayrı kalır. Yol yoksa no-op.
+pub fn sock_remove_stale(a: &SockAddr) -> Result<(), String> {
+    if let Some(msg) = sock_non_socket(a) {
+        return Err(msg);
+    }
+    #[cfg(unix)]
+    {
+        match std::fs::remove_file(a) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(format!("remove {}: {}", a.display(), e)),
+        }
+    }
+    #[cfg(windows)]
+    {
+        let _ = a;
+        Ok(())
+    }
+}
+
 /// Convention-scan dizini (RFC Katman 3B). Unix: `/tmp`.
 pub fn scan_dir() -> PathBuf {
     #[cfg(unix)]
@@ -382,5 +429,50 @@ mod tests {
         use std::path::PathBuf;
         let p = PathBuf::from("/tmp/hbmon-abc.sock");
         assert_eq!(from_explicit(p.clone()), p);
+    }
+
+    /// TASK-047/S1: socket-olmayan yol silinmez (veri kaybı koruması).
+    #[cfg(unix)]
+    #[test]
+    fn non_socket_path_refused_and_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("hbmon-userdata.sock");
+        std::fs::write(&p, b"important user data").unwrap();
+        let addr = from_explicit(p.clone());
+        assert!(sock_non_socket(&addr).is_some());
+        assert!(sock_remove_stale(&addr).is_err());
+        assert_eq!(std::fs::read(&p).unwrap(), b"important user data");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stale_socket_is_removed_and_missing_is_noop() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("hbmon-stale.sock");
+        let l = std::os::unix::net::UnixListener::bind(&p).unwrap();
+        let addr = from_explicit(p.clone());
+        assert!(sock_non_socket(&addr).is_none());
+        assert!(sock_remove_stale(&addr).is_ok());
+        assert!(!p.exists());
+        drop(l);
+        // Yok olan yol: ne çakışma ne hata (idempotent bayat temizlik).
+        assert!(sock_non_socket(&addr).is_none());
+        assert!(sock_remove_stale(&addr).is_ok());
+    }
+
+    /// Symlink socket sayılmaz: hem reddedilir hem hedef korunur.
+    #[cfg(unix)]
+    #[test]
+    fn symlink_path_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let real = dir.path().join("hbmon-real.sock");
+        let link = dir.path().join("hbmon-link.sock");
+        let l = std::os::unix::net::UnixListener::bind(&real).unwrap();
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        let addr = from_explicit(link.clone());
+        assert!(sock_non_socket(&addr).is_some());
+        assert!(sock_remove_stale(&addr).is_err());
+        drop(l);
+        assert!(real.exists() && link.exists(), "symlink/hedef korunmalı");
     }
 }

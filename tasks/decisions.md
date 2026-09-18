@@ -119,3 +119,44 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
 - 3. göz: RFC TR/EN komut enumerasyonları + USAGE-PATTERNS `events`'siz
   kalmıştı → güncellendi (EN ağaç satırı bayt-aynı). Yeni IPC op yok,
   `IPC_OPS`/drift yeşil, kilit ("pull-tabanlı") bozulmadı.
+
+## 2026-09-18 — 2./3. göz incelemesi: P1 düzeltmeleri (TASK-047)
+
+- Yöntem: 7 canlı deney (A–G) + kod okuması; 3 doğrulanmış P1 kusur,
+  1 şüphe (kilit inversiyonu) reddedildi, platform iddiaları kanıtsız
+  olarak işaretlendi.
+- **S1 (veri kaybı):** `--sock` var olan socket-olmayan yolu
+  gösterdiğinde `spawn_watch` koşulsuz `remove_file` çağırıyordu (canlı:
+  probe dosyası socket'e dönüştü) → `paths::sock_remove_stale` +
+  `sock_non_socket` (unix `FileTypeExt::is_socket`; symlink de reddedilir,
+  yok olan yol çakışma sayılmaz). Handshake artık ön-uçuştan sonra basılır.
+- **S2 (liveness):** `wait --until` yalnız terminal-olmayan sinyalle bitmiş
+  build'de deadline'a kadar bekliyordu (canlı: 124@3.1s; linger sonrası
+  `connection closed` + exit 3) → `wait_match` terminal state'i kanonik
+  adla döndürür (`terminal_signal`). `codec` EOF'u `connection closed`
+  diye ayırır (eskiden yanıltıcı `empty request`). Değişiklik dondurulmuş
+  yüzeyde **eklemeli**: `woke_on` sözlüğü aynı, yeni ad yok; README/
+  PROTOCOL/RFC TR+EN senkron.
+- **S3a (correctness):** `exec --timeout-sec` yok sayılıyordu (canlı: 2 s
+  bayrağıyla 6.10 s) → stderr tee thread'e taşındı + watchdog (TERM → 5 s
+  grace → KILL, exit 124; `0`/yok = kapalı). Grup kill bilinçli yok:
+  stdin inherit/Ctrl-C semantiği korunur, grup için `watch`.
+- Takipte (ayrı TASK adayı): exec stdout dep taraması, non-detach `watch`
+  linger/çıktı, `log_tail` sondan-okuma, exit-code tutarlılığı/no-op
+  bayraklar, ölü kod, `index.json` sürüm drifti.
+
+## 2026-09-18 — TASK-048 kalan bulguların kapası
+
+- **S3b kapatıldı:** `exec` hem stdout hem stderr'i tee eder ve tarar
+  (bayt-aynı stdout yönlendirme + dep taraması); `watch` ile parity
+  sağlandı. PROTOCOL/README/RFC güncellendi.
+- **S3c kapatıldı:** non-detach `watch` artık 60 s linger'atmaz
+  (`run_daemon(cfg, linger=false)`); `spawn_watch` ayırt yaparak
+  `linger` parametresini iletir.
+- **S4a kapatıldı:** `kill` → `killed:false` + exit 1 (önceden her
+  durumda `killed:true`/exit 0), `shutdown` → `ok_shutdown`
+  denetimi, `cleanup` → `failed` sayacı + exit 1.
+- **S4b kısmen:** `wait --poll-ms` sunucu tarafında en az 50 ms'ye
+  clamplandı; `--pid`/`--label` wiring TASK-049'a alındı.
+- Takipte: S4b `--pid`/`--label` wiring (kapsam), S4d ölü kod silme
+  (riskli), S5 `index.json` sürüm/O_NOFOLLOW (doküman).

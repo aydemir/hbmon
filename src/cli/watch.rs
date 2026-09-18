@@ -15,7 +15,7 @@ pub struct WatchArgs {
     /// Event log path (default: platform convention, see platform::paths)
     #[arg(long)]
     pub log: Option<PathBuf>,
-    /// Parent pid hint (validation/logging only; daemon is detached anyway)
+    /// Parent pid (sets Shared.parent_pid; ready event includes it).
     #[arg(long)]
     pub pid: Option<u32>,
     /// Detach into background daemon (setsid + double fork)
@@ -44,8 +44,13 @@ pub fn run(a: WatchArgs) -> Result<i32, String> {
         validate_uuid(u)?;
     }
     let uuid = a.uuid.unwrap_or_else(generate_uuid);
-    let mut cfg = MonitorConfig::new(uuid, a.sock, a.log, a.cmd, a.timeout_sec, a.label);
+    let mut cfg = MonitorConfig::new(uuid, a.sock, a.log, a.cmd, a.timeout_sec, a.label, a.pid);
     cfg.max_log_bytes = a.max_log_mb.map(|m| m.saturating_mul(1024 * 1024));
+    // Handshake'ten ÖNCE ön-uçuş (TASK-047/S1): var olan yol socket
+    // değilse "ready" basıp sonra patlamak yerine hemen exit 3.
+    if let Some(msg) = crate::platform::paths::sock_non_socket(&cfg.sock) {
+        return Err(msg);
+    }
     if a.detach {
         // spawn_watch double-forks; the caller (LLM shell) returns immediately.
         // Print handshake BEFORE forking so the LLM captures uuid/sock/log.

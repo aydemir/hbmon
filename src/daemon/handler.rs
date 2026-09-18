@@ -27,6 +27,8 @@ pub(crate) struct Shared {
     pub(crate) build_code: Mutex<Option<i32>>,
     pub(crate) exit_secs: Mutex<Option<f64>>,
     pub(crate) root_pid: Mutex<Option<u32>>,
+    pub(crate) parent_pid: Mutex<Option<u32>>,
+    pub(crate) label: Mutex<Option<String>>,
     pub(crate) dep_info: Mutex<Option<Value>>,
     pub(crate) oom_info: Mutex<Option<Value>>,
     pub(crate) stall_threshold: Mutex<f32>,
@@ -101,7 +103,11 @@ pub(crate) fn dispatch(req: Value, shared: &Shared, logger_path: &Path) -> Value
                 .get("timeout_sec")
                 .and_then(|v| v.as_f64())
                 .unwrap_or(300.0);
-            let poll_ms = req.get("poll_ms").and_then(|v| v.as_u64()).unwrap_or(500);
+            let poll_ms = req
+                .get("poll_ms")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(500)
+                .max(50);
             // until yoksa boş liste → yalnızca terminal state'ler (eski davranış).
             let until: Vec<String> = req
                 .get("until")
@@ -177,9 +183,14 @@ pub(crate) fn dispatch(req: Value, shared: &Shared, logger_path: &Path) -> Value
             if pid == 0 {
                 return error_response(&id, "BUILD_NOT_FOUND", "no root pid");
             }
-            kill_pgroup(pid, sig);
+            // Check BEFORE signal: already-dead builds → killed:false (S4a).
+            let was_alive = crate::platform::inspector().is_alive(pid);
+            if was_alive {
+                kill_pgroup(pid, sig);
+            }
+            let killed = was_alive;
             let mut m = serde_json::Map::new();
-            m.insert("killed".to_string(), json!(true));
+            m.insert("killed".to_string(), json!(killed));
             ok_response(&id, m)
         }
         "shutdown" => {
@@ -193,8 +204,9 @@ pub(crate) fn dispatch(req: Value, shared: &Shared, logger_path: &Path) -> Value
                     kill_pgroup(pid, Sig::Kill);
                 }
             }
+            let ok = *shared.shutdown.lock().unwrap();
             let mut m = serde_json::Map::new();
-            m.insert("ok_shutdown".to_string(), json!(true));
+            m.insert("ok_shutdown".to_string(), json!(ok));
             ok_response(&id, m)
         }
         "" => error_response(&id, "INVALID_REQUEST", "missing op"),
@@ -211,6 +223,14 @@ fn status_map(shared: &Shared, logger_path: &Path) -> serde_json::Map<String, Va
     m.insert(
         "root_pid".to_string(),
         json!(shared.root_pid.lock().unwrap().unwrap_or(0)),
+    );
+    m.insert(
+        "parent_pid".to_string(),
+        json!(*shared.parent_pid.lock().unwrap()),
+    );
+    m.insert(
+        "label".to_string(),
+        json!(shared.label.lock().unwrap().clone()),
     );
     m.insert("root_cmd".to_string(), json!(shared.root_cmd));
     m.insert("started_at".to_string(), json!(shared.started_iso));
@@ -305,6 +325,12 @@ fn status_compact(shared: &Shared) -> serde_json::Map<String, Value> {
 /// build bitmeden de eşleşebilir — erken dönüşün çekirdeği.
 /// Bilinmeyen adlar `dispatch`'te `validate_until` ile reddedilir
 /// (INVALID_UNTIL); burada savunma amaçlı yok sayılır.
+///
+/// TASK-047/S2: terminal state listede YOKSA bile döner (kanonik adla).
+/// Aksi hâlde bitmiş build'de `--until stall_suspect` deadline'a kadar
+/// bekliyordu: timeout → 124, deadline linger'ı (60 s) aşarsa daemon
+/// çekilip istemci "connection closed" → exit 3 alıyordu. Bir daha
+/// sinyal üretemeyecek terminal durum, beklemeye değmez.
 fn wait_match(state: State, until: &[String], dep_hit: bool, oom_hit: bool) -> Option<String> {
     if until.is_empty() {
         if matches!(
@@ -329,7 +355,20 @@ fn wait_match(state: State, until: &[String], dep_hit: bool, oom_hit: bool) -> O
             return Some(want.clone());
         }
     }
-    None
+    terminal_signal(state)
+}
+
+/// Terminal state → kanonik `wait --until` sinyal adı (TASK-047/S2).
+/// Ara durumlar (running/stalled) `None`: erken sinyal sabrı korunur.
+fn terminal_signal(state: State) -> Option<String> {
+    match state {
+        State::Done => Some("done".to_string()),
+        State::Failed => Some("failed".to_string()),
+        State::DepMissing => Some("dep_missing".to_string()),
+        State::Timeout => Some("timeout".to_string()),
+        State::OomKilled => Some("oom_suspect".to_string()),
+        State::Running | State::Stalled => None,
+    }
 }
 
 #[cfg(test)]
@@ -389,6 +428,46 @@ mod tests {
         assert_eq!(
             wait_match(State::OomKilled, &["oom_killed".to_string()], false, false),
             Some("oom_killed".to_string())
+        );
+    }
+
+    /// TASK-047/S2: terminal state listede olmasa da döner — bitmiş
+    /// build'de deadline/linger beklemek yerine dürüst sonuç verilir.
+    #[test]
+    fn terminal_state_wakes_even_when_not_listed() {
+        let u = vec!["stall_suspect".to_string()];
+        assert_eq!(
+            wait_match(State::Done, &u, false, false),
+            Some("done".into())
+        );
+        assert_eq!(
+            wait_match(State::Failed, &u, false, false),
+            Some("failed".into())
+        );
+        assert_eq!(
+            wait_match(State::DepMissing, &u, false, false),
+            Some("dep_missing".into())
+        );
+        assert_eq!(
+            wait_match(State::Timeout, &u, false, false),
+            Some("timeout".into())
+        );
+        assert_eq!(
+            wait_match(State::OomKilled, &u, false, false),
+            Some("oom_suspect".into())
+        );
+    }
+
+    /// Ara durumlar terminal değil: erken sinyal sabrı bozulmaz.
+    #[test]
+    fn non_terminal_states_still_wait() {
+        let u = vec!["done".to_string()];
+        assert_eq!(wait_match(State::Running, &u, false, false), None);
+        assert_eq!(wait_match(State::Stalled, &u, false, false), None);
+        // İstenen ara sinyal yine kazanır (kanonik ad).
+        assert_eq!(
+            wait_match(State::Stalled, &["stall_suspect".to_string()], false, false),
+            Some("stall_suspect".to_string())
         );
     }
 }

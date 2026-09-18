@@ -383,6 +383,12 @@ alanıyla döner; polling ve harness eklentisi gerekmez. Bilinmeyen sinyal adı
 çoğullamalı beklemedir, async push değil (`until` yoksa yalnızca terminal
 state'lerde dönülür).
 
+> Not (v1 gerçekleşmesi, TASK-047): terminal state (`done`/`failed`/
+> `dep_missing`/`timeout`/`oom_killed`) listede olmasa da çağrı döner;
+> `woke_on` kanonik sinyal adını taşır (OOM için `oom_suspect`). Bitmiş
+> build'de "erken sinyal" beklemek deadline/linger tuzağıydı: timeout
+> dolmadan 124, linger (60 s) aşılırsa daemon çekilip exit 3 dönüyordu.
+
 ##### Operation: `kill`
 
 ```json
@@ -508,6 +514,12 @@ Sonra build çıktısı gelir.
 > Not (v1 gerçekleşmesi, TASK-007): `exec` ephemeral'dır — handshake'teki
 > `sock`/`log` rezerve addır, dosya oluşmaz; `status`/`wait` denenmez.
 > Handshake `"ephemeral":true` + `"note"` taşır.
+
+> Not (v1 gerçekleşmesi, TASK-047): `exec --timeout-sec N` watchdogludur
+> (TERM → 5 s grace → KILL, exit 124; `0`/yok = kapalı, doğrudan çocuk
+> öldürülür — grup için `watch`). Dep taraması `exec`'te hem stdout hem
+> stderr'i tarar (TASK-048/S3b, `watch` ile parity); `watch` iki akışı da
+> `.out` üzerinden tarar — bu fark `PROTOCOL.md`'de yazılıdır.
 
 ### 6.2 Hangisi Tercih Edilmeli?
 
@@ -888,8 +900,8 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 - [x] CLI: watch, status, wait, exec, kill, shutdown, cleanup, list, log, events
   (+`status --compact`, `wait --until` sözlüğü, `cleanup --dir`, `watch --max-log-mb`,
   `log --event`, `list --state`/`--live-only`, `events` akışı — TASK-005/016/017/023/024/029/046)
-- [x] ~70 unit + 14 integration (+2 sandbox-ignore) + 3 drift testi
-  (2026-09-13, `cargo test --locked -j2` yeşil; sözleşme kilidi TASK-028)
+- [x] 92 unit + 21 integration (+2 sandbox-ignore) + 3 drift + 1 smoke testi
+  (2026-09-18, `cargo test --locked -j2` yeşil; sözleşme kilidi TASK-028)
 
 ### 14.2 v1.5
 

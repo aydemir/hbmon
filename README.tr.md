@@ -53,6 +53,7 @@ hbmon wait --sock /tmp/hbmon-<uuid>.sock --timeout 600
 # status/wait kullanılamaz, çıkışta sock/log oluşmaz)
 hbmon exec -- make -j8   # exit: 0 ok, 1 fail, 2 dep-missing
 hbmon exec --format json -- make -j8  # stderr son satır: JSON özet
+hbmon exec --timeout-sec 600 -- make -j8  # watchdog: exit 124 (0 = kapalı)
 
 # Öldür / kapat
 hbmon kill --sock ... --signal TERM
@@ -70,10 +71,14 @@ Salt CLI / skill / plugin+MCP tüketim desenleri: [USAGE-PATTERNS.md](USAGE-PATT
 2. Poll: `hbmon status --sock $SOCK` (ucuz yoklama: `--compact`), veya bloklan:
    `hbmon wait --sock $SOCK --until done,failed,dep_missing,timeout,stall_suspect,oom_suspect`
    (alyas: `stalled`, `oom_killed`; bilinmeyen ad → `INVALID_UNTIL`, exit 3).
+   Terminal state listede olmasa da döner (`woke_on` = kanonik ad) — bitmiş
+   build daemon linger'ını beklemez.
 3. Exit: `0 done / 1 failed / 2 dep-missing / 124 timeout / 137 oom / 3 iç hata`.
    `2` ise eksik paketi kur + yeniden dene.
 4. `exec` ephemeral'dır: handshake'teki `sock`/`log` rezerve addır, dosya
-   oluşmaz — `status`/`wait` deneme.
+   oluşmaz — `status`/`wait` deneme. `--timeout-sec N` watchdogludur
+   (TERM → 5 s grace → KILL, exit 124; `0` = kapalı) ve dep taraması
+   yalnız stderr'dedir (`watch` iki akışı `.out`'tan tarar).
 5. Keşif sırası: `--sock > $HBMON_SOCK > /tmp/hbmon-*.sock` (newest);
    hepsini gör: `hbmon list` (salt-okunur; `--state running` / `--live-only` filtreler).
    Olaylar için `hbmon log --sock $SOCK --tail N` (tüm `.jsonl`'u cat'leme;
@@ -102,6 +107,16 @@ timeout stall_suspect oom_suspect`, alyaslar `stalled oom_killed`),
 kill shutdown`). Deneysel (değişebilir): metrik alanları, stall
 eşikleri/skorları, `metrics`/`log_tail` çıktı detayları. Kilit:
 `tests/drift.rs`.
+
+TASK-047 (eklemeli, testle kilitli): `wait --until` terminal state'i listede
+olmasa da döner (`woke_on` kanonik ad; OOM → `oom_suspect`),
+`exec --timeout-sec` → `124` (TERM → 5 s grace → KILL; `0` = kapalı) ve
+`--sock` socket-olmayan yolu silmek yerine reddeder, `exec` hem stdout hem
+stderr'i tarar (`watch` ile parity).
+TASK-048 (eklemeli, testle kilitli): `kill`/`shutdown`/`cleanup`
+exit 1 döner başarısızlıkta (`killed:false` / `ok_shutdown:false` /
+`failed>0`), `wait --poll-ms` sunucu tarafında en az 50 ms'ye clamplanır,
+foreground `watch` bitişte anında döner (linger yok).
 
 ## Durum
 

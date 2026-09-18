@@ -24,6 +24,8 @@ Keep `sock`. Discovery if lost: `--sock` flag > `$HBMON_SOCK` > newest
 - Block with early return:
   `hbmon wait --sock $SOCK --until done,failed,dep_missing,timeout,stall_suspect,oom_suspect`
   (aliases: `stalled`, `oom_killed`; unknown name → `INVALID_UNTIL`, exit 3)
+  A terminal state returns even if it is not listed — a finished build
+  never waits out the linger.
 - Events, never full logs: `hbmon log --sock $SOCK --tail N [--event metric]`
 
 ## Exit codes and actions

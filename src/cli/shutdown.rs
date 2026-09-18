@@ -18,6 +18,13 @@ pub fn run(a: ShutdownArgs) -> Result<i32, String> {
     let sock = resolve_sock(a.sock)?;
     let req = json!({"v":1,"op":"shutdown","id":generate_uuid(),"force":a.force});
     let resp = send_request(&sock, &req, 10)?;
+    let ok = resp
+        .get("ok_shutdown")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !ok {
+        return Err("shutdown failed".to_string());
+    }
     println!("{}", serde_json::to_string(&resp).unwrap());
     Ok(0)
 }

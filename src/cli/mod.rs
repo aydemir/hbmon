@@ -107,6 +107,7 @@ fn run_cleanup(a: CleanupArgs) -> Result<i32, String> {
     // kardeş dosyalarına (.jsonl/.out/.pid) dokunma — yaşa bakılmaksızın.
     let live: std::collections::HashSet<String> = live_uuids(&entries);
     let mut removed = 0u32;
+    let mut failed = 0u32;
     for (name, path) in &entries {
         let age_ok = std::fs::metadata(path)
             .and_then(|m| m.modified())
@@ -115,11 +116,17 @@ fn run_cleanup(a: CleanupArgs) -> Result<i32, String> {
             .map(|d| d.as_secs() > a.older_than)
             .unwrap_or(false);
         if age_ok && sweep_decision(name, &live) {
-            std::fs::remove_file(path).ok();
-            removed += 1;
+            if std::fs::remove_file(path).is_err() {
+                failed += 1;
+            } else {
+                removed += 1;
+            }
         }
     }
-    println!("{{\"removed\":{}}}", removed);
+    println!("{{\"removed\":{},\"failed\":{}}}", removed, failed);
+    if failed > 0 {
+        return Err(format!("cleanup failed for {failed} files"));
+    }
     Ok(0)
 }
 

@@ -30,6 +30,13 @@ pub fn run(a: KillArgs) -> Result<i32, String> {
     let sock = resolve_sock(a.sock)?;
     let req = json!({"v":1,"op":"kill","id":generate_uuid(),"signal":sig.to_num()});
     let resp = send_request(&sock, &req, 10)?;
+    let killed = resp
+        .get("killed")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !killed {
+        return Err("build already finished or not killable".to_string());
+    }
     println!("{}", serde_json::to_string(&resp).unwrap());
     Ok(0)
 }

@@ -14,7 +14,10 @@ is in [HBMON-RFC.md](HBMON-RFC.md); frozen-vs-experimental promises are in
 
 Parse line 1, keep `sock`. `hbmon exec -- <cmd>` prints the same shape plus
 `"ephemeral":true` — `sock`/`log` are reserved names, no files are created,
-`status`/`wait` do not exist for it.
+`status`/`wait` do not exist for it. `exec` exits `0/1/2`, and
+`--timeout-sec N` adds a watchdog (`124`; TERM → 5 s grace → KILL; `0` = off).
+Both stdout and stderr are tee'd and scanned for dep-missing patterns
+(`watch` scans both streams via `.out` — parity, TASK-048/S3b).
 
 ## 2. Discovery
 
@@ -28,7 +31,7 @@ Parse line 1, keep `sock`. `hbmon exec -- <cmd>` prints the same shape plus
 | `status` | full snapshot (state, metrics, tree, health, log_tail) |
 | `status` + `compact:true` | cheap poll: `state uuid elapsed_sec health last_event code?` |
 | `metrics` | counters only |
-| `wait` | block until a signal or `--timeout` (see §4) |
+| `wait` | block until a signal or `--timeout` (see §4; terminal states return even if unlisted) |
 | `log_tail` | last N `.jsonl` lines, optional `event` filter |
 | `kill` | TERM/KILL the build process group |
 | `shutdown` | stop the daemon (kills the build) |
@@ -40,10 +43,15 @@ Canonical: `done failed dep_missing timeout stall_suspect oom_suspect`
 Empty `--until` = wait for terminal states only. Unknown name →
 `INVALID_UNTIL`, exit 3. Early return adds `woke_on:<name>`.
 
+A terminal state always returns, even when it is not in `--until`
+(`woke_on` = canonical name; OOM → `oom_suspect`) — a finished build never
+waits out the 60 s linger.
+
 ## 5. Exit codes
 
-`0` done · `1` failed · `2` dep-missing (install + retry) · `124` timeout ·
-`137` oom · `3` internal error. `stall_suspect`/`oom_suspect` are heuristics:
+`0` done · `1` failed · `2` dep-missing (install + retry) · `124` timeout
+(`wait --timeout`, `exec --timeout-sec`, `events --timeout`) · `137` oom ·
+`3` internal error. `stall_suspect`/`oom_suspect` are heuristics:
 confirm with `status --compact` + `log --event metric` before acting.
 
 ## 6. Files & permissions

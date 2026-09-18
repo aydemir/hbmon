@@ -51,6 +51,16 @@ cargo test --locked -j2
   3 internal`. `2`'de paketi kur + retry; `wait --until` kanonik isimler
   `done failed dep_missing timeout stall_suspect oom_suspect`
   (alias `stalled oom_killed`; bilinmeyen → `INVALID_UNTIL`, exit 3).
+- TASK-047: `wait --until` terminal state'i listede olmasa da döner
+  (`woke_on` kanonik ad; OOM → `oom_suspect`) — bitmiş build linger'ı
+  beklenmez. `exec --timeout-sec N` → 124 (TERM→5s grace→KILL, `0`=kapalı),
+  ve dep taraması hem stdout hem stderr'de olur (TASK-048/S3b, `watch`
+  ikisi de `.out`'tan tarar). `--sock` socket-olmayan var olan yolu
+  **silmez**, reddeder (exit 3).
+- TASK-048: `kill`/`shutdown`/`cleanup` başarısızsa exit 1
+  (`killed:false` / `ok_shutdown:false` / `failed>0`), `wait --poll-ms`
+  sunucu tarafında en az 50 ms'ye clamplanır, foreground `watch`
+  linger'sız döner.
 - `stall/oom_suspect` heuristiktir: `status --compact` + `log --event`
   ile doğrula, sonra `kill`/retry kararı ver.
 - `status` connect hatası = stale sock → tekrar `watch` et, eski sock'u
