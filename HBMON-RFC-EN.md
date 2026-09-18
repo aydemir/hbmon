@@ -5,8 +5,8 @@
 
 | Field | Value |
 |---|---|
-| **Status** | In sync with v0.1.1 (draft period closed) |
-| **Date** | 2026-09-09 (first draft) — last sync 2026-09-13 |
+| **Status** | In sync with v0.2.0 (draft period closed) |
+| **Date** | 2026-09-09 (first draft) — last sync 2026-09-18 |
 | **Author** | (user) — original architecture design; Rust implementation plan by Mavis |
 | **Audience** | LLM harness developers, build-orchestration authors, agent users on projects with high build times |
 | **Reference** | `aydemir/opencode-plugins` — DHS PTC + `build-mon.mjs` (+ `hbmon-build-mon.mjs` adapter) + `opencode-settle-noticer` (existence proof; `.sh` predecessors in `scripts/archive/`) |
@@ -696,9 +696,9 @@ The `status` response contains these fields: `v`, `id`, `ok`, `state` (`running`
 | Event | Trigger | Extra Fields |
 |---|---|---|
 | `ready` | Daemon handshake (stdout line 1; not written to `.jsonl`) | `sock`, `log`, `root_pid`, `cmd` |
-| `spawn` | (in schema; not emitted in v0.1.1) | `pid`, `cmd`, `ppid` |
-| `child_spawn` | (in schema; not emitted in v0.1.1 — its projection is `health.last_child_spawn_at`) | `pid`, `ppid`, `cmd` |
-| `child_exit` | (in schema; not emitted in v0.1.1) | `pid`, `code`, `duration_sec` |
+| `spawn` | (in schema; not emitted in v0.2.0) | `pid`, `cmd`, `ppid` |
+| `child_spawn` | (in schema; not emitted in v0.2.0 — its projection is `health.last_child_spawn_at`) | `pid`, `ppid`, `cmd` |
+| `child_exit` | (in schema; not emitted in v0.2.0) | `pid`, `code`, `duration_sec` |
 | `exit` | Root finished | `pid`, `code`, `duration_sec`, `state` |
 | `metric` | Periodic measurement | `cpu`, `rss_mb`, `io_r`, `io_w`, `fds` |
 | `stall_suspect` | Stall heuristic triggered | `reason`, `idle_sec`, `threshold_sec` |
@@ -928,6 +928,9 @@ Required minimum: **shell command + file read.** Both exist in all modern harnes
    (exec ephemeral handshake, incremental dep-scan, Windows port, wait--until,
    status-compact, sock-gc/list, log CLI + cap, dep-patterns, uuid lock,
    contract lock, log/list filters, crate hygiene, crates.io release).
+10. v0.2.0 (TASK-047/048): exec --timeout-sec watchdog, terminal wait return,
+    sock cleanup security fix, log tail_filter memory bound, kill/shutdown
+    exit code consistency, O_NOFOLLOW, dead code removal, P0/S1 patches.
 
 ---
 
@@ -940,4 +943,4 @@ Required minimum: **shell command + file read.** Both exist in all modern harnes
 
 ---
 
-**End of document. v0.1 Draft + v1 MVP outcome notes (in sync with v0.1.1, TASK-031). Open for feedback and revision.**
+**End of document. v0.1 Draft + v1/v2 MVP outcome notes (in sync with v0.2.0, TASK-031/047/048). Open for feedback and revision.**

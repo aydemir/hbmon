@@ -31,7 +31,7 @@ cgroup politikası HBMon'un kontrol alanı dışındadır (detay [HBMON-RFC.md](
 ## Kurulum
 
 ```bash
-cargo install hbmon   # crates.io, v0.1.0+
+cargo install hbmon   # crates.io, v0.2.0+
 # veya kaynaktan: cargo build --release  # strip'li ikilik 2.38MB (v0.1.0, <5MB hedefi; CI `size` job'u izler)
 # Windows: aynısı → target\release\hbmon.exe (named pipe transport)
 ```

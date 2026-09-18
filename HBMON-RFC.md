@@ -3,8 +3,8 @@
 
 | Alan | Değer |
 |---|---|
-| **Durum** | v0.1.1 ile senkron (taslak dönemi kapandı) |
-| **Tarih** | 2026-09-09 (ilk taslak) — son senkron 2026-09-13 |
+| **Durum** | v0.2.0 ile senkron (taslak dönemi kapandı) |
+| **Tarih** | 2026-09-09 (ilk taslak) — son senkron 2026-09-18 |
 | **Yazar** | (kullanıcı) — orijinal mimari tasarım; Rust implementasyon planı Mavis tarafından |
 | **Hedef kitle** | LLM harness geliştiricileri, build-orchestration yazanlar, derleme süresi yüksek projelerde ajan kullananlar |
 | **Referans** | `aydemir/opencode-plugins` — DHS PTC + `build-mon.mjs` (+ `hbmon-build-mon.mjs` adapter) + `opencode-settle-noticer` (varlık kanıtı; `.sh` öncüller `scripts/archive/`'da) |
@@ -703,9 +703,9 @@ oom-kill:constraint=CONSTRAINT_MEMCG,...
 | Event | Tetikleyici | Ek Alanlar |
 |---|---|---|
 | `ready` | Daemon handshake (stdout satır 1; `.jsonl`'a yazılmaz) | `sock`, `log`, `root_pid`, `cmd` |
-| `spawn` | (şemada; v0.1.1'de emit edilmiyor) | `pid`, `cmd`, `ppid` |
-| `child_spawn` | (şemada; v0.1.1'de emit edilmiyor — izdüşümü `health.last_child_spawn_at`) | `pid`, `ppid`, `cmd` |
-| `child_exit` | (şemada; v0.1.1'de emit edilmiyor) | `pid`, `code`, `duration_sec` |
+| `spawn` | (şemada; v0.2.0'da emit edilmiyor) | `pid`, `cmd`, `ppid` |
+| `child_spawn` | (şemada; v0.2.0'da emit edilmiyor — izdüşümü `health.last_child_spawn_at`) | `pid`, `ppid`, `cmd` |
+| `child_exit` | (şemada; v0.2.0'da emit edilmiyor) | `pid`, `code`, `duration_sec` |
 | `exit` | Root bitti | `pid`, `code`, `duration_sec`, `state` |
 | `metric` | Periyodik ölçüm | `cpu`, `rss_mb`, `io_r`, `io_w`, `fds` |
 | `stall_suspect` | Stall heuristic tetiklendi | `reason`, `idle_sec`, `threshold_sec` |
@@ -941,6 +941,9 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
    (exec ephemeral handshake, incremental dep-scan, Windows portu, wait--until,
    status-compact, sock-gc/list, log CLI + cap, dep-patterns, uuid kilidi,
    sözleşme kilidi, log/list filtreleri, crate hijyeni, crates.io yayını).
+10. v0.2.0 (TASK-047/048): exec --timeout-sec watchdog, terminal wait dönüşü,
+    sock temizlik güvenlik fix'i, log tail_filter bellek sınırı, kill/shutdown
+    exit kod tutarlılığı, O_NOFOLLOW, ölü kod temizliği, P0/S1 yamaları.
 
 ---
 
@@ -953,4 +956,4 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 
 ---
 
-**Doküman sonu. v0.1 Draft + v1 MVP gerçekleşme notları (v0.1.1 ile senkron, TASK-031). Geri bildirim ve revizyon için açık.**
+**Doküman sonu. v0.1 Draft + v1/v2 MVP gerçekleşme notları (v0.2.0 ile senkron, TASK-031/047/048). Geri bildirim ve revizyon için açık.**
