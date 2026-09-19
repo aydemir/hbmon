@@ -62,3 +62,4 @@
 | TASK-046 | hbmon events (istemci-taraflı olay akışı) | done | P2 |
 | TASK-047 | 2./3. göz inceleme kaydı + P1 düzeltmeleri (sock guard, wait terminal, exec timeout) | done | P1 |
 | TASK-048 | TASK-047 incelemesinin kalan bulguları (exec stdout, watchdog UX, log_tail belleği, exit kodları, ölü kod) | done | P1 |
+| TASK-049 | Proje simgesi (GitHub README + crates vitrini) | done | P3 |

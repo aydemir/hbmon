@@ -1,5 +1,9 @@
 **English** | [Türkçe](README.tr.md)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/aydemir/hbmon/master/assets/logo.png" width="128" alt="hbmon logo — heartbeat-face CRT monitor" />
+</p>
+
 # hbmon — Harness-Independent Build Monitor
 
 Single-binary, zero-runtime-dependency build watcher for LLM coding agents.

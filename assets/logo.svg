@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="hbmonLogoTitle">
+  <title id="hbmonLogoTitle">hbmon logo — heartbeat-face CRT monitor</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#182747"/>
+      <stop offset="0.55" stop-color="#0b1428"/>
+      <stop offset="1" stop-color="#060b16"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d3dae3"/>
+      <stop offset="1" stop-color="#a7b0bc"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b2117"/>
+      <stop offset="1" stop-color="#050f0a"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.6" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- backdrop -->
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="url(#bg)"/>
+  <!-- faint circuit traces -->
+  <g fill="none" stroke="#2b4a7a" stroke-width="3" opacity="0.5" stroke-linecap="round">
+    <path d="M24 64 H52 V96"/>
+    <path d="M232 64 H204 V96"/>
+    <path d="M24 192 H52 V160"/>
+    <path d="M232 192 H204 V160"/>
+  </g>
+  <g fill="#3b82f6" opacity="0.8">
+    <circle cx="52" cy="96" r="4"/>
+    <circle cx="204" cy="96" r="4"/>
+    <circle cx="52" cy="160" r="4"/>
+    <circle cx="204" cy="160" r="4"/>
+  </g>
+
+  <!-- stand -->
+  <rect x="114" y="184" width="28" height="12" rx="3" fill="#7d8590"/>
+  <rect x="88" y="196" width="80" height="14" rx="6" fill="url(#frame)" stroke="#6b7280" stroke-width="1.5"/>
+
+  <!-- monitor frame -->
+  <rect x="46" y="48" width="164" height="130" rx="14" fill="url(#frame)" stroke="#6b7280" stroke-width="2"/>
+  <rect x="58" y="60" width="140" height="106" rx="9" fill="url(#screen)" stroke="#2a3441" stroke-width="2"/>
+
+  <!-- screen glare -->
+  <ellipse cx="128" cy="76" rx="72" ry="14" fill="#ffffff" opacity="0.05"/>
+
+  <!-- eye rings -->
+  <g fill="none" stroke="#22cc66" stroke-width="3" opacity="0.55">
+    <circle cx="101" cy="103" r="23"/>
+    <circle cx="155" cy="103" r="23"/>
+  </g>
+
+  <!-- heartbeat eyes -->
+  <g fill="none" stroke="#4ade80" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+    <path d="M70 103 L78 103 L83 88 L89 118 L94 96 L97 103 L104 103 L108 82 L114 126 L118 96 L121 103 L126 103"/>
+    <path d="M130 103 L134 103 L139 88 L145 118 L150 96 L153 103 L158 103 L162 82 L168 126 L172 96 L175 103 L186 103"/>
+  </g>
+
+  <!-- circuit smile with center pulse -->
+  <g fill="none" stroke="#4ade80" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+    <path d="M78 132 L96 132 L104 146 L112 146 L119 128 L123 146 L127 132 L134 132 L142 146 L150 146 L158 132 L178 132"/>
+    <path d="M178 132 L190 132 L190 122"/>
+    <path d="M78 132 L66 132 L66 122"/>
+  </g>
+  <g fill="#050f0a" stroke="#4ade80" stroke-width="3">
+    <circle cx="66" cy="118" r="5"/>
+    <circle cx="190" cy="118" r="5"/>
+    <circle cx="108" cy="150" r="4.5"/>
+    <circle cx="148" cy="150" r="4.5"/>
+  </g>
+
+  <!-- bezel LEDs -->
+  <g>
+    <circle cx="182" cy="184" r="3" fill="#4b5563"/>
+    <circle cx="192" cy="184" r="3" fill="#22cc66" opacity="0.6"/>
+    <circle cx="202" cy="184" r="3.5" fill="#4ade80" filter="url(#glow)"/>
+  </g>
+</svg>

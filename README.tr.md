@@ -1,5 +1,9 @@
 [English](README.md) | **Türkçe**
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/aydemir/hbmon/master/assets/logo.png" width="128" alt="hbmon logosu — nabız-yüzlü CRT monitör" />
+</p>
+
 # hbmon — Harness-Bağımsız Build Monitor
 
 LLM kodlama ajanları için tek ikilik, sıfır-runtime-bağımlılık derleme izleyici.

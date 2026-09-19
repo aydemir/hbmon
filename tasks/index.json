@@ -833,5 +833,21 @@
     "created": "2026-09-18",
     "updated": "2026-09-18",
     "file": "tasks/done/TASK-048-review-kalan-bulgular.md"
+  },
+  {
+    "id": "TASK-049",
+    "title": "Proje simgesi (GitHub README + crates vitrini)",
+    "status": "done",
+    "priority": "P3",
+    "environment": "both",
+    "labels": [
+      "branding",
+      "docs",
+      "hygiene"
+    ],
+    "depends_on": [],
+    "created": "2026-09-19",
+    "updated": "2026-09-19",
+    "file": "tasks/done/TASK-049-logo.md"
   }
 ]
