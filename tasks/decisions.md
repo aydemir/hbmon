@@ -184,3 +184,17 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
 - Doğrulama: `x86_64-apple-darwin` target'ı yerelde kurulup
   `cargo clippy --target ... -- -D warnings` temiz alındı (CI beklemeden
   gerçek kanıt).
+
+## 2026-09-23 — TASK-052 sonrası CI notu (kırmızı kalanlar)
+
+- macOS clippy yeşil (bu committe kanıtlandı). Fail-fast kalktığı için
+  alttaki iki borç görünür oldu — ikisi de TASK-050/051/052 diff'ine
+  dokunmaz (düşen testler arasında handshake testi de var; mod:
+  "daemon never came up", yani startup/bind katmanı):
+  - macOS `test-ignored`: 2 test (`cleanup-guard`, `list`) — sock yolu
+    runner TMPDIR'ı ile ~135 bayt, macOS UDS sınırı 104. Test-tasarımı
+    + ortam sorunu; `uuid()` kısaltılamaz (TASK-012).
+  - Windows `test`: 7 entegrasyon testi aynı modda düşüyor (spawn/named
+    pipe). Yerel repro yok (Linux'tayız) — Windows makinede debug gerekir.
+- Aday: TASK-053 (macOS ignored sock yolu), TASK-054 (Windows CI spawn).
+  Açık istek olmadan girilmedi.
