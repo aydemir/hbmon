@@ -1,10 +1,10 @@
 ---
 id: TASK-054
 title: "Windows CI spawn borçları (7 entegrasyon testi: daemon never came up)"
-status: todo
+status: done
 priority: P1
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 environment: windows
 labels: [windows, tests, ci]
 depends_on: []
@@ -62,3 +62,25 @@ yok — bu görev bilinçli olarak Windows makineye bırakıldı.)
 
 - CI `build-test (windows-latest)` yeşil (fmt + clippy + test +
   test-ignored)
+
+## Bulgular ve Çözüm (2026-09-24, Windows makine)
+
+- Yerel repro: `cargo test --locked -j2` aynı 7 testi düşürdü (CI ile
+  birebir) — tekil koşuda da düşer, paralel çekişme değil.
+- Kök neden: `windows_detach` re-exec'te `--detach` bayrağını düşürür;
+  çocuk `watch`'ı `detach=false` ile parse edip
+  `run_daemon(cfg, linger=false)` koşuyordu. Build bitince pipe hemen
+  kapanıyordu: kısa işte `status` → `pipe wait ...: 2`, `wait` →
+  `pipe io failed: 109` (broken pipe). Uzun işler (sleep 30+) test
+  süresince canlı kaldığı için geçiyordu — yavaş-runner hipotezi elendi,
+  stale-pipe/Job-Object hipotezlerine gerek kalmadı.
+- Fix (CLI yüzeyi yok, IPC op yok, ek bağımlılık yok):
+  `src/platform/detach.rs` çocuk env'ine `HBMON_DETACHED_CHILD=<uuid>`
+  yazar (`CreateProcessW` parent env'ini devralır); `src/cli/watch.rs`
+  değer uuid ile eşleşirse handshake basmadan/re-detach yapmadan
+  `run_daemon(cfg, true)` (60 s linger) koşar, var'ı hemen siler
+  (build'e sızmaz). Unix yolu değişmedi (double-fork aynı proseste).
+- Doğrulama (bu makine): `cargo test --locked -j2` →
+  21 passed, 2 ignored (proot-ignored'lar); `-- --ignored` → 2 passed;
+  `cargo fmt` + `cargo clippy --locked --all-targets -- -D warnings`
+  temiz. CI windows sonucu bekleniyor.

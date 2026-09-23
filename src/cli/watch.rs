@@ -1,6 +1,8 @@
 use clap::Parser;
 use std::path::PathBuf;
 
+#[cfg(windows)]
+use crate::daemon::run_daemon;
 use crate::daemon::{spawn_watch, MonitorConfig};
 use crate::util::{generate_uuid, validate_uuid};
 
@@ -46,6 +48,22 @@ pub fn run(a: WatchArgs) -> Result<i32, String> {
     let uuid = a.uuid.unwrap_or_else(generate_uuid);
     let mut cfg = MonitorConfig::new(uuid, a.sock, a.log, a.cmd, a.timeout_sec, a.label, a.pid);
     cfg.max_log_bytes = a.max_log_mb.map(|m| m.saturating_mul(1024 * 1024));
+    // TASK-054: Windows detach re-exec'i `--detach`'siz gelir; çocuk
+    // `detach=false` kolundan `linger=false` ile koşar, pipe build bitince
+    // kapanırdı (7 test: "daemon never came up" / broken pipe 109).
+    // Linger kararı bu iç env ile taşınır (değer = uuid; CLI yüzeyi yok).
+    // Parent handshake'i zaten bastı → çocuk basmaz, re-detach yapmaz,
+    // doğrudan 60 s linger'lı daemon'u koşar. Build env'e sızmasın diye
+    // var hemen silinir (`run_daemon` build'i inherit ile spawn'lar).
+    #[cfg(windows)]
+    if std::env::var("HBMON_DETACHED_CHILD")
+        .map(|v| v == cfg.uuid)
+        .unwrap_or(false)
+    {
+        std::env::remove_var("HBMON_DETACHED_CHILD");
+        run_daemon(cfg, true)?;
+        return Ok(0);
+    }
     // Handshake'ten ÖNCE ön-uçuş (TASK-047/S1): var olan yol socket
     // değilse "ready" basıp sonra patlamak yerine hemen exit 3.
     if let Some(msg) = crate::platform::paths::sock_non_socket(&cfg.sock) {

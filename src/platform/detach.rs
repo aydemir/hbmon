@@ -99,6 +99,12 @@ fn windows_detach(uuid: &str) -> Result<(), String> {
     let exe = std::env::current_exe().map_err(|e| format!("current_exe: {}", e))?;
     let mut args = filtered_argv();
     ensure_uuid(&mut args, uuid);
+    // Re-exec `--detach` bayrağını düşürür → çocuk `watch`'ı `detach=false`
+    // ile yeniden parse eder. Linger kararı (`run_daemon(cfg, linger)`)
+    // argv'den değil bu iç env'den taşınır (TASK-054): değer uuid'nin
+    // kendisi, yabancı/yanlış değerli çocuk sayılmaz. `CreateProcessW`
+    // `lpEnvironment=NULL` ile parent env'ini devralır.
+    std::env::set_var("HBMON_DETACHED_CHILD", uuid);
     // Komut satırı: `"exe" "arg1" ...` (CreateProcessW mutable buffer ister).
     let mut cmdline = quote_arg(&exe.to_string_lossy());
     for a in &args {
@@ -142,6 +148,7 @@ fn windows_detach(uuid: &str) -> Result<(), String> {
     };
     if !winffi::valid(si.std_input) || !winffi::valid(si.std_output) || !winffi::valid(si.std_error)
     {
+        std::env::remove_var("HBMON_DETACHED_CHILD");
         return Err("detach: NUL open failed".to_string());
     }
     let flags0 = winffi::DETACHED_PROCESS
@@ -189,6 +196,7 @@ fn windows_detach(uuid: &str) -> Result<(), String> {
         }
     }
     if ok == 0 {
+        std::env::remove_var("HBMON_DETACHED_CHILD");
         return Err(format!("detach spawn: {}", unsafe {
             winffi::GetLastError()
         }));

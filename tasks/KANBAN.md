@@ -66,4 +66,4 @@
 | TASK-050 | Exit olayına özet satırı (bg_logs önizleme) | done | P2 |
 | TASK-051 | v0.2.1 release (patch + binary + crates.io) | done | P1 |
 | TASK-052 | macOS clippy sıfırlama (cfg artefaktı) | done | P1 |
-| TASK-054 | Windows CI spawn borçları (7 test) | todo | P1 |
+| TASK-054 | Windows CI spawn borçları (7 test) | done | P1 |

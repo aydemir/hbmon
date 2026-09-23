@@ -185,6 +185,19 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
   `cargo clippy --target ... -- -D warnings` temiz alındı (CI beklemeden
   gerçek kanıt).
 
+## 2026-09-24 — TASK-054 Windows detach linger kararı
+
+- Kök neden: `windows_detach` re-exec'i `--detach`'siz kurar; çocuk
+  `linger=false` ile koşup pipe'ı build çıkışında kapatıyordu. Hipotez
+  listesindeki yavaş-runner/stale-pipe/Job-Object yollarına girilmedi —
+  tekil repro + `echo hi`'da 300 ms'de `pipe wait: 2` kanıtı yetti.
+- Linger kararı argv'den değil iç env'den taşınır:
+  `HBMON_DETACHED_CHILD=<uuid>` (CLI yüzeyi donmuş, yeni bayrak yok;
+  değer uuid — yabancı değer çocuk sayılmaz; build'e sızmaması için
+  çocuk var'ı hemen siler). Unix double-fork aynı proseste kaldığı
+  için dokunulmadı.
+- `exec` etkilenmez (detach yok), IPC op/`IPC_OPS` drift yeşil.
+
 ## 2026-09-23 — TASK-052 sonrası CI notu (kırmızı kalanlar)
 
 - macOS clippy yeşil (bu committe kanıtlandı). Fail-fast kalktığı için
