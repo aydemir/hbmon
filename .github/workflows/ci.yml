@@ -3,6 +3,9 @@ on: [push, pull_request]
 jobs:
   build-test:
     strategy:
+      # fail-fast kapalı: bir platform kızıllaşınca diğerleri (öz. windows)
+      # iptal edilmesin — her OS kendi sinyalini versin (TASK-054).
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
