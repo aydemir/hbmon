@@ -35,7 +35,7 @@ policy is outside HBMon's control (see [HBMON-RFC-EN.md](HBMON-RFC-EN.md) §4.2.
 ## Install
 
 ```bash
-cargo install hbmon   # crates.io, v0.2.0+
+cargo install hbmon   # crates.io, v0.2.1+
 # or from source: cargo build --release  # stripped binary ~2.4MB (v0.1.0, <5MB goal; CI `size` job watches it)
 # Windows: same → target\release\hbmon.exe (named-pipe transport)
 ```

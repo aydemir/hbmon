@@ -19,6 +19,11 @@ const MAX_BYTES: u64 = 100 * 1024 * 1024; // 100MB cap (RFC 5.2.1)
 const TAIL_WINDOW: u64 = 64 * 1024;
 const TAIL_WINDOW_MAX: u64 = 4 * 1024 * 1024;
 
+/// Exit özeti üst sınırı (TASK-050): `.out`'un son 2KB'ı. Karar: yalnızca
+/// son pencere (ilk 1KB + son 1KB değil) — başarısızlık nedeni neredeyse
+/// her zaman kuyruktadır ve tek pencere okuma+kesme mantığını basit tutar.
+pub const EXIT_SUMMARY_MAX: usize = 2048;
+
 pub struct EventLogger {
     path: PathBuf,
     file: Mutex<File>,
@@ -91,6 +96,32 @@ impl EventLogger {
 
     pub fn tail(path: &Path, n: usize) -> Vec<String> {
         Self::tail_filter(path, n, None)
+    }
+
+    /// `.out`'un son penceresinden exit-önizleme (TASK-050): `ev:"exit"`
+    /// satırındaki `summary` alanı. Satır sınırında kesilir (budanmışsa
+    /// yarım ilk satır atılır, başına `…` konur); küçük dosya aynen döner.
+    /// Bellek O(2KB). Yok/boş/içeriksiz `.out` → `None` (alan yazılmaz,
+    /// eski log'lar summary'siz geçerli kalır). İçindeki satırsonları
+    /// aynen korunur — JSON kaçar (`serde_json`).
+    pub fn exit_summary(out: &Path) -> Option<String> {
+        let (buf, truncated) = tail_bytes(out, EXIT_SUMMARY_MAX as u64)?;
+        let mut text = String::from_utf8_lossy(&buf).into_owned();
+        if truncated {
+            match text.find('\n') {
+                Some(i) => {
+                    text.drain(..=i);
+                    text.insert(0, '…');
+                }
+                None => text.insert(0, '…'),
+            }
+        }
+        let trimmed = text.trim_end_matches(['\n', '\r']).to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
     }
 
     /// Son N satırın `event` alt-kümesi (TASK-029): `None` = filtresiz.
@@ -183,6 +214,21 @@ fn scan_from_start(path: &Path, n: usize, needle: Option<&str>) -> Vec<String> {
         }
     }
     kept.into_iter().collect()
+}
+
+/// Dosyanın son `max` baytı + budanma bayrağı (TASK-050). Bellek O(max).
+fn tail_bytes(path: &Path, max: u64) -> Option<(Vec<u8>, bool)> {
+    let mut file = File::open(path).ok()?;
+    let len = file.metadata().map(|m| m.len()).unwrap_or(0);
+    if len == 0 || max == 0 {
+        return None;
+    }
+    let truncated = len > max;
+    let start = len.saturating_sub(max);
+    file.seek(SeekFrom::Start(start)).ok()?;
+    let mut buf = vec![0u8; (len - start) as usize];
+    file.read_exact(&mut buf).ok()?;
+    Some((buf, truncated))
 }
 
 fn validate_tmp_path(p: &Path) -> Result<(), String> {
@@ -310,5 +356,59 @@ mod tests {
         assert!(EventLogger::tail(&p, 5).is_empty());
         std::fs::write(&p, "a\nb\n").unwrap();
         assert!(EventLogger::tail(&p, 0).is_empty());
+    }
+
+    /// TASK-050: küçük `.out` aynen özetlenir (budama yok, `…` yok).
+    #[test]
+    fn exit_summary_small_file_is_verbatim() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("small.out");
+        std::fs::write(&p, "hello\nworld\n").unwrap();
+        assert_eq!(
+            EventLogger::exit_summary(&p).as_deref(),
+            Some("hello\nworld")
+        );
+    }
+
+    /// TASK-050: büyük `.out` son 2KB'a budanır, satır sınırında kesilir.
+    #[test]
+    fn exit_summary_large_file_is_tail_at_line_boundary() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("big.out");
+        let mut body = String::new();
+        for i in 0..500 {
+            body.push_str(&format!("filler line {:04} ....................\n", i));
+        }
+        body.push_str("TAIL-MARKER-LAST-LINE\n");
+        std::fs::write(&p, &body).unwrap();
+        assert!(std::fs::metadata(&p).unwrap().len() > EXIT_SUMMARY_MAX as u64);
+
+        let s = EventLogger::exit_summary(&p).expect("özet olmalı");
+        assert!(s.starts_with('…'), "budanan özet … ile başlar");
+        assert!(s.ends_with("TAIL-MARKER-LAST-LINE"), "özet kuyruğu korur");
+        assert!(
+            s.len() <= EXIT_SUMMARY_MAX + '…'.len_utf8() + 1,
+            "özet ~2KB'ı aşmaz: {}",
+            s.len()
+        );
+        // Yarım ilk satır yok: …'den sonrası tam satırla başlar.
+        let after: String = s.chars().skip(1).collect();
+        assert!(
+            body.contains(&after[..after.find('\n').unwrap_or(after.len())]),
+            "ilk satır tam olmalı"
+        );
+    }
+
+    /// TASK-050: yok/boş/içeriksiz `.out` → alan yazılmaz (`None`).
+    #[test]
+    fn exit_summary_missing_or_blank_is_none() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(EventLogger::exit_summary(&dir.path().join("yok.out")).is_none());
+        let empty = dir.path().join("empty.out");
+        std::fs::write(&empty, "").unwrap();
+        assert!(EventLogger::exit_summary(&empty).is_none());
+        let blank = dir.path().join("blank.out");
+        std::fs::write(&blank, "\n\n").unwrap();
+        assert!(EventLogger::exit_summary(&blank).is_none());
     }
 }

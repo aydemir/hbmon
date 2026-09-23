@@ -1158,3 +1158,62 @@ fn watch_refuses_to_remove_non_socket_path() {
     assert!(err.contains("non-socket"), "stderr: {}", err);
     assert_eq!(std::fs::read(&p).unwrap(), b"important user data");
 }
+
+/// TASK-050: `ev:"exit"` satırı `.out` kuyruğundan `summary` taşır —
+/// tüketici (nabız `bg_logs`) tam log'u açmadan önizleme görür.
+/// Sözleşme: `summary` opsiyonel, max ~2KB, satır sınırında kesik.
+#[test]
+fn exit_event_carries_out_summary() {
+    let id = uuid("exit-summary");
+    let s = sock_for(&id);
+    let out = hbmon()
+        .args(watch_args(
+            &id,
+            shell_cmd("echo HEAD-LINE-AAA; echo TAIL-LINE-BBB"),
+        ))
+        .timeout(Duration::from_secs(30))
+        .output()
+        .unwrap();
+    assert!(out.status.success());
+    wait_for_ready(&s);
+
+    // Exit olayını bekle (daemon 500ms döngüde yayınlar).
+    let deadline = std::time::Instant::now() + Duration::from_secs(20);
+    let exit_ev: Value = loop {
+        let l = hbmon()
+            .args(["log", "--sock", &s, "--tail", "5", "--event", "exit"])
+            .timeout(Duration::from_secs(30))
+            .output()
+            .unwrap();
+        assert!(l.status.success());
+        let lv: Value = serde_json::from_slice(&l.stdout).unwrap();
+        let lines = lv["lines"].as_array().expect("lines dizisi");
+        if let Some(first) = lines.first() {
+            break serde_json::from_str(first.as_str().expect("satır string")).unwrap();
+        }
+        if std::time::Instant::now() >= deadline {
+            panic!("exit olayı günlüğe düşmedi");
+        }
+        std::thread::sleep(Duration::from_millis(300));
+    };
+    assert_eq!(exit_ev["ev"], "exit");
+    assert_eq!(exit_ev["code"], 0);
+    let summary = exit_ev
+        .get("summary")
+        .and_then(|v| v.as_str())
+        .expect("exit summary alanı olmalı");
+    assert!(
+        summary.contains("TAIL-LINE-BBB"),
+        "özet kuyruğu içermeli: {summary}"
+    );
+    assert!(
+        summary.len() <= 2048 + 8,
+        "özet ~2KB cap'i aşmamalı: {}",
+        summary.len()
+    );
+    hbmon()
+        .args(["shutdown", "--sock", &s])
+        .timeout(Duration::from_secs(10))
+        .output()
+        .unwrap();
+}

@@ -63,3 +63,5 @@
 | TASK-047 | 2./3. göz inceleme kaydı + P1 düzeltmeleri (sock guard, wait terminal, exec timeout) | done | P1 |
 | TASK-048 | TASK-047 incelemesinin kalan bulguları (exec stdout, watchdog UX, log_tail belleği, exit kodları, ölü kod) | done | P1 |
 | TASK-049 | Proje simgesi (GitHub README + crates vitrini) | done | P3 |
+| TASK-050 | Exit olayına özet satırı (bg_logs önizleme) | done | P2 |
+| TASK-051 | v0.2.1 release (patch + binary + crates.io) | done | P1 |

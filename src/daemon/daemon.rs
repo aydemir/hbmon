@@ -163,6 +163,17 @@ struct PollCtx<'a> {
     started_secs: f64,
 }
 
+/// Exit olayı extra alanları + `.out` özeti (TASK-050). Özet opsiyonel:
+/// `.out` yok/boşsa alan yazılmaz, eski log'lar summary'siz okunmaya
+/// devam eder (`exit_code_of` yalnızca `code`'a bakar).
+fn exit_extra(ctx: &PollCtx, pairs: &[(&str, Value)]) -> HashMap<String, Value> {
+    let mut extra = events::kv(pairs);
+    if let Some(s) = EventLogger::exit_summary(&ctx.cfg.out) {
+        extra.insert("summary".to_string(), json!(s));
+    }
+    extra
+}
+
 /// One 500ms monitor tick: tree metrics, stall/OOM/dep/timeout, eventlog.
 /// Returns true when the monitor loop must stop. Pure transplant of the old
 /// `run_daemon` loop body — no behavior change.
@@ -401,12 +412,15 @@ fn poll_once(ctx: &mut PollCtx, st: &mut Poll) -> bool {
         let exit_ev = events::new_event(
             "exit",
             &ctx.cfg.uuid,
-            events::kv(&[
-                ("pid", json!(ctx.child_pid)),
-                ("code", json!(124)),
-                ("duration_sec", json!(now_secs() - ctx.started_secs)),
-                ("state", json!("timeout")),
-            ]),
+            exit_extra(
+                ctx,
+                &[
+                    ("pid", json!(ctx.child_pid)),
+                    ("code", json!(124)),
+                    ("duration_sec", json!(now_secs() - ctx.started_secs)),
+                    ("state", json!("timeout")),
+                ],
+            ),
         );
         ctx.logger.append(&exit_ev);
         *ctx.shared.last_event.lock().unwrap() = exit_ev;
@@ -432,13 +446,16 @@ fn poll_once(ctx: &mut PollCtx, st: &mut Poll) -> bool {
         let ev = events::new_event(
             "exit",
             &ctx.cfg.uuid,
-            events::kv(&[
-                ("pid", json!(ctx.child_pid)),
-                ("code", json!(mapped)),
-                ("raw_code", json!(code)),
-                ("duration_sec", json!(duration)),
-                ("state", json!(state.as_str())),
-            ]),
+            exit_extra(
+                ctx,
+                &[
+                    ("pid", json!(ctx.child_pid)),
+                    ("code", json!(mapped)),
+                    ("raw_code", json!(code)),
+                    ("duration_sec", json!(duration)),
+                    ("state", json!(state.as_str())),
+                ],
+            ),
         );
         ctx.logger.append(&ev);
         *ctx.shared.last_event.lock().unwrap() = ev;
@@ -452,12 +469,15 @@ fn poll_once(ctx: &mut PollCtx, st: &mut Poll) -> bool {
         let ev = events::new_event(
             "exit",
             &ctx.cfg.uuid,
-            events::kv(&[
-                ("pid", json!(ctx.child_pid)),
-                ("code", json!(3)),
-                ("duration_sec", json!(now_secs() - ctx.started_secs)),
-                ("state", json!("failed")),
-            ]),
+            exit_extra(
+                ctx,
+                &[
+                    ("pid", json!(ctx.child_pid)),
+                    ("code", json!(3)),
+                    ("duration_sec", json!(now_secs() - ctx.started_secs)),
+                    ("state", json!("failed")),
+                ],
+            ),
         );
         ctx.logger.append(&ev);
         *ctx.shared.last_event.lock().unwrap() = ev;

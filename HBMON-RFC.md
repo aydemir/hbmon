@@ -3,7 +3,7 @@
 
 | Alan | Değer |
 |---|---|
-| **Durum** | v0.2.0 ile senkron (taslak dönemi kapandı) |
+| **Durum** | v0.2.1 ile senkron (taslak dönemi kapandı) |
 | **Tarih** | 2026-09-09 (ilk taslak) — son senkron 2026-09-18 |
 | **Yazar** | (kullanıcı) — orijinal mimari tasarım; Rust implementasyon planı Mavis tarafından |
 | **Hedef kitle** | LLM harness geliştiricileri, build-orchestration yazanlar, derleme süresi yüksek projelerde ajan kullananlar |
@@ -706,7 +706,7 @@ oom-kill:constraint=CONSTRAINT_MEMCG,...
 | `spawn` | (şemada; v0.2.0'da emit edilmiyor) | `pid`, `cmd`, `ppid` |
 | `child_spawn` | (şemada; v0.2.0'da emit edilmiyor — izdüşümü `health.last_child_spawn_at`) | `pid`, `ppid`, `cmd` |
 | `child_exit` | (şemada; v0.2.0'da emit edilmiyor) | `pid`, `code`, `duration_sec` |
-| `exit` | Root bitti | `pid`, `code`, `duration_sec`, `state` |
+| `exit` | Root bitti | `pid`, `code`, `duration_sec`, `state`, `summary?` |
 | `metric` | Periyodik ölçüm | `cpu`, `rss_mb`, `io_r`, `io_w`, `fds` |
 | `stall_suspect` | Stall heuristic tetiklendi | `reason`, `idle_sec`, `threshold_sec` |
 | `stall_resolved` | Stall sona erdi | `lasted_sec` |
@@ -716,6 +716,11 @@ oom-kill:constraint=CONSTRAINT_MEMCG,...
 | `health_change` | (şemada; v0.1.1'de emit edilmiyor — izdüşümü `status.state`) | `from`, `to` |
 | `timeout` | Timeout aşıldı | `elapsed_sec`, `limit_sec` |
 | `shutdown` | Daemon kapanıyor | `reason` |
+
+> `exit.summary` (TASK-050, opsiyonel): `.out`'un son ~2KB'ından satır
+> sınırında kesilmiş önizleme (budanmışsa başında `…`). Tüketici önce
+> özeti okur, tam log'u yalnızca gerektiğinde açar (context ekonomisi).
+> Ham kırpma — LLM/AI yorumu yok. Eski log'lar summary'siz geçerli kalır.
 
 ### 8.4 Hata Response
 
@@ -944,6 +949,8 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 10. v0.2.0 (TASK-047/048): exec --timeout-sec watchdog, terminal wait dönüşü,
     sock temizlik güvenlik fix'i, log tail_filter bellek sınırı, kill/shutdown
     exit kod tutarlılığı, O_NOFOLLOW, ölü kod temizliği, P0/S1 yamaları.
+11. v0.2.1 (TASK-050/051): `exit.summary` — `.out` son ~2KB önizleme
+    (opsiyonel, satır sınırında kesik); eklemeli, breaking yok.
 
 ---
 
@@ -956,4 +963,4 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 
 ---
 
-**Doküman sonu. v0.1 Draft + v1/v2 MVP gerçekleşme notları (v0.2.0 ile senkron, TASK-031/047/048). Geri bildirim ve revizyon için açık.**
+**Doküman sonu. v0.1 Draft + v1/v2 MVP gerçekleşme notları (v0.2.1 ile senkron, TASK-031/047/048/050). Geri bildirim ve revizyon için açık.**

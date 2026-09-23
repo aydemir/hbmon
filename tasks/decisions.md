@@ -160,3 +160,14 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
   clamplandı; `--pid`/`--label` wiring TASK-049'a alındı.
 - Takipte: S4b `--pid`/`--label` wiring (kapsam), S4d ölü kod silme
   (riskli), S5 `index.json` sürüm/O_NOFOLLOW (doküman).
+
+## 2026-09-23 — TASK-050 exit summary kararı
+
+- **Pencere:** yalnızca son 2KB (ilk 1KB + son 1KB değil) — başarısızlık
+  nedeni neredeyse her zaman kuyruktadır, tek pencere kesme mantığını
+  basit tutar. Satır sınırında kesilir, budanmışsa başına `…` konur.
+- **Kapsam:** yalnız `watch` daemon exit'i (`.out` dosyası var). `exec`
+  çıktıyı zaten canlı tee'ler — özet N/A, JSON şekli aynı (`summary`
+  her yerde opsiyonel). `status --compact`'a gömülmedi (ayrı TASK adayı).
+- Hedef kilidiyle uyumlu (context ekonomisi): ek bağımlılık yok,
+  `tests/drift.rs` allow-list'e dokunulmadı.

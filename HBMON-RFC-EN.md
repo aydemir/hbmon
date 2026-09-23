@@ -5,7 +5,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | In sync with v0.2.0 (draft period closed) |
+| **Status** | In sync with v0.2.1 (draft period closed) |
 | **Date** | 2026-09-09 (first draft) — last sync 2026-09-18 |
 | **Author** | (user) — original architecture design; Rust implementation plan by Mavis |
 | **Audience** | LLM harness developers, build-orchestration authors, agent users on projects with high build times |
@@ -699,7 +699,7 @@ The `status` response contains these fields: `v`, `id`, `ok`, `state` (`running`
 | `spawn` | (in schema; not emitted in v0.2.0) | `pid`, `cmd`, `ppid` |
 | `child_spawn` | (in schema; not emitted in v0.2.0 — its projection is `health.last_child_spawn_at`) | `pid`, `ppid`, `cmd` |
 | `child_exit` | (in schema; not emitted in v0.2.0) | `pid`, `code`, `duration_sec` |
-| `exit` | Root finished | `pid`, `code`, `duration_sec`, `state` |
+| `exit` | Root finished | `pid`, `code`, `duration_sec`, `state`, `summary?` |
 | `metric` | Periodic measurement | `cpu`, `rss_mb`, `io_r`, `io_w`, `fds` |
 | `stall_suspect` | Stall heuristic triggered | `reason`, `idle_sec`, `threshold_sec` |
 | `stall_resolved` | Stall ended | `lasted_sec` |
@@ -709,6 +709,12 @@ The `status` response contains these fields: `v`, `id`, `ok`, `state` (`running`
 | `health_change` | (in schema; not emitted in v0.1.1 — its projection is `status.state`) | `from`, `to` |
 | `timeout` | Timeout exceeded | `elapsed_sec`, `limit_sec` |
 | `shutdown` | Daemon shutting down | `reason` |
+
+> `exit.summary` (TASK-050, optional): preview cut at a line boundary from
+> the last ~2KB of `.out` (leading `…` when trimmed). Consumers read the
+> summary first and open the full log only when needed (context economy).
+> Raw truncation — no LLM/AI interpretation. Old logs without summary
+> remain valid.
 
 ### 8.4 Error Response
 
@@ -931,6 +937,8 @@ Required minimum: **shell command + file read.** Both exist in all modern harnes
 10. v0.2.0 (TASK-047/048): exec --timeout-sec watchdog, terminal wait return,
     sock cleanup security fix, log tail_filter memory bound, kill/shutdown
     exit code consistency, O_NOFOLLOW, dead code removal, P0/S1 patches.
+11. v0.2.1 (TASK-050/051): `exit.summary` — last ~2KB preview of `.out`
+    (optional, cut at line boundary); additive, no breaking changes.
 
 ---
 
@@ -943,4 +951,4 @@ Required minimum: **shell command + file read.** Both exist in all modern harnes
 
 ---
 
-**End of document. v0.1 Draft + v1/v2 MVP outcome notes (in sync with v0.2.0, TASK-031/047/048). Open for feedback and revision.**
+**End of document. v0.1 Draft + v1/v2 MVP outcome notes (in sync with v0.2.1, TASK-031/047/048/050). Open for feedback and revision.**

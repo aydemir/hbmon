@@ -54,6 +54,11 @@ waits out the 60 s linger.
 `3` internal error. `stall_suspect`/`oom_suspect` are heuristics:
 confirm with `status --compact` + `log --event metric` before acting.
 
+The `exit` event carries an optional `summary`: the last ~2KB of `.out`,
+cut at a line boundary (leading `…` when trimmed). Read
+`log --event exit` first; open the full `.out` only when the summary is
+not enough. Old logs without `summary` remain valid.
+
 ## 6. Files & permissions
 
 Per monitor: `.sock` `.pid` `.jsonl` `.out` under `/tmp` (unix) —

@@ -278,4 +278,18 @@ mod tests {
         assert_eq!(exit_code_of(r#"{"v":1,"ev":"metric"}"#), None);
         assert_eq!(exit_code_of("bozuk"), None);
     }
+
+    /// TASK-050: `summary`'li exit (yeni) ve summary'siz exit (eski log)
+    /// aynı kodu verir — alan tamamen opsiyonel.
+    #[test]
+    fn exit_line_with_or_without_summary_yields_code() {
+        assert_eq!(
+            exit_code_of(r#"{"v":1,"ev":"exit","code":0,"summary":"tail…"}"#),
+            Some(0)
+        );
+        assert_eq!(
+            exit_code_of(r#"{"v":1,"ev":"exit","uuid":"u","pid":1,"code":1,"state":"failed"}"#),
+            Some(1)
+        );
+    }
 }
