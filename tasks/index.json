@@ -898,5 +898,21 @@
     "created": "2026-09-23",
     "updated": "2026-09-23",
     "file": "tasks/done/TASK-052-macos-clippy.md"
+  },
+  {
+    "id": "TASK-054",
+    "title": "Windows CI spawn borçları (7 entegrasyon testi: daemon never came up)",
+    "status": "todo",
+    "priority": "P1",
+    "environment": "windows",
+    "labels": [
+      "windows",
+      "tests",
+      "ci"
+    ],
+    "depends_on": [],
+    "created": "2026-09-23",
+    "updated": "2026-09-23",
+    "file": "tasks/TASK-054-windows-ci-spawn.md"
   }
 ]
