@@ -109,6 +109,10 @@ pub fn spawn_watch(cfg: MonitorConfig, detach: bool) -> Result<MonitorConfig, St
 struct Poll {
     stall: StallDetector,
     watchdog: TimeoutWatchdog,
+    // macOS'ta `cfg(linux|windows)` CPU bloğu derlenmez → alan okunmaz.
+    // Platform artefaktı, gerçek ölü kod değil (TASK-052); izin yalnız
+    // macOS'a scoped, diğer hedeflerde `dead_code` koruması sürer.
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
     tracker: CpuTracker,
     prev_io: u64,
     prev_count: usize,
@@ -203,6 +207,9 @@ fn poll_once(ctx: &mut PollCtx, st: &mut Poll) -> bool {
     // v0.1 review fix: st.tracker output used to be discarded
     // (`let _ = pct`) while bulk cpu_pct is always 0.0, so tot_cpu
     // stayed 0 and the st.stall detector lost its CPU leg.
+    // `mut` yalnız `cfg(linux|windows)` insert'leri için gerekli;
+    // macOS'ta blok derlenmez → izin scoped (TASK-052).
+    #[cfg_attr(target_os = "macos", allow(unused_mut))]
     let mut cpu_by_pid: HashMap<u32, f32> = HashMap::new();
     // CPU deltas: CpuTracker converts raw ticks -> % per pid
     // (Linux jiffies, Windows FILETIME centis — same 100Hz unit).

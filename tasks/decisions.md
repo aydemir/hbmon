@@ -171,3 +171,16 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
   her yerde opsiyonel). `status --compact`'a gömülmedi (ayrı TASK adayı).
 - Hedef kilidiyle uyumlu (context ekonomisi): ek bağımlılık yok,
   `tests/drift.rs` allow-list'e dokunulmadı.
+
+## 2026-09-23 — TASK-052 macOS clippy kararı
+
+- Kök neden: `cpu_by_pid` (`mut`) + `Poll::tracker` yalnız
+  `cfg(linux|windows)` bloğunda kullanılıyor; macOS'ta blok derlenmeyince
+  `-D warnings` altında `unused_mut`/`dead_code` patlıyor. Davranış farkı
+  yok, saf platform artefaktı (CI'da `ab329f8`'den beri kırmızı).
+- Düzeltme: `cfg_attr(target_os = "macos", allow(...))` — izin yalnız
+  macOS'a scoped; Linux/Windows'ta lint koruması sürer. Alan/`mut`
+  silinmedi (CPU leg korunur).
+- Doğrulama: `x86_64-apple-darwin` target'ı yerelde kurulup
+  `cargo clippy --target ... -- -D warnings` temiz alındı (CI beklemeden
+  gerçek kanıt).

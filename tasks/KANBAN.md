@@ -65,3 +65,4 @@
 | TASK-049 | Proje simgesi (GitHub README + crates vitrini) | done | P3 |
 | TASK-050 | Exit olayına özet satırı (bg_logs önizleme) | done | P2 |
 | TASK-051 | v0.2.1 release (patch + binary + crates.io) | done | P1 |
+| TASK-052 | macOS clippy sıfırlama (cfg artefaktı) | done | P1 |
