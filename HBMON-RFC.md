@@ -3,7 +3,7 @@
 
 | Alan | Değer |
 |---|---|
-| **Durum** | v0.2.1 ile senkron (taslak dönemi kapandı) |
+| **Durum** | v0.2.2 ile senkron (taslak dönemi kapandı) |
 | **Tarih** | 2026-09-09 (ilk taslak) — son senkron 2026-09-18 |
 | **Yazar** | (kullanıcı) — orijinal mimari tasarım; Rust implementasyon planı Mavis tarafından |
 | **Hedef kitle** | LLM harness geliştiricileri, build-orchestration yazanlar, derleme süresi yüksek projelerde ajan kullananlar |
@@ -952,6 +952,8 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
     exit kod tutarlılığı, O_NOFOLLOW, ölü kod temizliği, P0/S1 yamaları.
 11. v0.2.1 (TASK-050/051): `exit.summary` — `.out` son ~2KB önizleme
     (opsiyonel, satır sınırında kesik); eklemeli, breaking yok.
+12. v0.2.2 (TASK-053/054/055): Windows detach linger (`HBMON_DETACHED_CHILD`),
+    macOS UDS yol helper'ı, `serve_error` tanısı; eklemeli, breaking yok.
 
 ---
 
@@ -964,4 +966,4 @@ Gerekli minimum: **shell komutu + dosya okuma.** İkisi de tüm modern harness'l
 
 ---
 
-**Doküman sonu. v0.1 Draft + v1/v2 MVP gerçekleşme notları (v0.2.1 ile senkron, TASK-031/047/048/050). Geri bildirim ve revizyon için açık.**
+**Doküman sonu. v0.1 Draft + v1/v2 MVP gerçekleşme notları (v0.2.2 ile senkron, TASK-031/047/048/050/053/054). Geri bildirim ve revizyon için açık.**

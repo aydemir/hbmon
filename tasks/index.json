@@ -902,7 +902,7 @@
   {
     "id": "TASK-053",
     "title": "macOS ignored sock yolu (UDS 104 bayt) + serve körlüğü",
-    "status": "todo",
+    "status": "done",
     "priority": "P1",
     "environment": "macos",
     "labels": [
@@ -913,7 +913,7 @@
     "depends_on": [],
     "created": "2026-09-24",
     "updated": "2026-09-24",
-    "file": "tasks/TASK-053-macos-uds-path.md"
+    "file": "tasks/done/TASK-053-macos-uds-path.md"
   },
   {
     "id": "TASK-054",
@@ -930,5 +930,23 @@
     "created": "2026-09-23",
     "updated": "2026-09-24",
     "file": "tasks/done/TASK-054-windows-ci-spawn.md"
+  },
+  {
+    "id": "TASK-055",
+    "title": "v0.2.2 release (patch + binary + crates.io)",
+    "status": "todo",
+    "priority": "P1",
+    "environment": "both",
+    "labels": [
+      "release",
+      "distribution"
+    ],
+    "depends_on": [
+      "TASK-053",
+      "TASK-054"
+    ],
+    "created": "2026-09-24",
+    "updated": "2026-09-24",
+    "file": "tasks/TASK-055-v022-release.md"
   }
 ]

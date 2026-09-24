@@ -185,7 +185,16 @@ HBMON-RFC.md repoda yokken verilen öneriler hedef kilidine çarpıldı:
   `cargo clippy --target ... -- -D warnings` temiz alındı (CI beklemeden
   gerçek kanıt).
 
-## 2026-09-24 — TASK-053 macOS UDS kararı (açık)
+## 2026-09-24 — TASK-053 macOS UDS kararı (kapandı, CI yeşil)
+
+- Teşhis: düşen 2 ignored test `tempfile::tempdir()` → `$TMPDIR`
+  (`/var/folders/...`) altında sock kurar; ~115+ bayt macOS UDS
+  sınırını (104) aşar, `bind` düşer. `serve` hatası `let _ =` ile
+  yutulduğu için daemon kör koşuyordu.
+- Yön: test helper kısa dizin (`/tmp`, unix) + `serve_error` olayı
+  (tanı log'da). `uuid()` kısaltma yok (TASK-012), sock hash/kesme
+  yok (sözleşme), `serve` imzası aynı.
+- CI koşusu `35938529809`: 5/5 yeşil (macos dahil) — teori kanıtlandı.
 
 - Teşhis: düşen 2 ignored test `tempfile::tempdir()` → `$TMPDIR`
   (`/var/folders/...`) altında sock kurar; ~115+ bayt macOS UDS

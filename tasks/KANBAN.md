@@ -66,5 +66,6 @@
 | TASK-050 | Exit olayına özet satırı (bg_logs önizleme) | done | P2 |
 | TASK-051 | v0.2.1 release (patch + binary + crates.io) | done | P1 |
 | TASK-052 | macOS clippy sıfırlama (cfg artefaktı) | done | P1 |
-| TASK-053 | macOS ignored sock yolu (UDS 104) + serve körlüğü | todo | P1 |
+| TASK-053 | macOS ignored sock yolu (UDS 104) + serve körlüğü | done | P1 |
 | TASK-054 | Windows CI spawn borçları (7 test) | done | P1 |
+| TASK-055 | v0.2.2 release (patch + binary + crates.io) | todo | P1 |

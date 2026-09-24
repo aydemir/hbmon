@@ -1,7 +1,7 @@
 ---
 id: TASK-053
 title: "macOS ignored sock yolu (UDS 104 bayt) + serve körlüğü"
-status: todo
+status: done
 priority: P1
 created: 2026-09-24
 updated: 2026-09-24
@@ -60,4 +60,5 @@ yeşil — borç bu iki testte.
 
 - Yerel (Win): full süit 21 passed/2 ignored, `-- --ignored` 2 passed,
   fmt+clippy temiz, cross clippy (mac/linux) temiz.
-- CI `build-test (macos-latest)` yeşil (test + test-ignored).
+- CI `build-test (macos-latest)` yeşil (test + test-ignored) —
+  koşu `35938529809`: 5/5 job success (macos, windows, 2×ubuntu, size).

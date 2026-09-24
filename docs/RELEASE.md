@@ -32,7 +32,9 @@ Alternatif: Actions → `publish-crate` workflow'unu tag adıyla manuel
 - `v0.1.1` crates.io'da yayında (2026-09-13 dry-run ile doğrulandı:
   `hbmon@0.1.1 already exists`). Aynı numaraya yeniden publish yok.
 - `v0.2.0` yayında (2026-09-18, TASK-047/048 breaking-adjacent düzeltmeler).
-- Sonraki: `v0.2.1` (TASK-050 `exit.summary` eklemeli/non-breaking → patch).
+- `v0.2.1` yayında (2026-09-23, TASK-050/051: `exit.summary`).
+- Sonraki: `v0.2.2` (TASK-053/054/055: detach linger + UDS helper +
+  `serve_error`; hepsi eklemeli/non-breaking → patch).
 - Token/ownership: maintainer `~/.cargo/credentials`'ta; CI secret'ı
   `CRATES_IO_TOKEN` (yoksa workflow çalıştırılmaz, binary release
   etkilenmez).

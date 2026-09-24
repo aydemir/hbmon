@@ -5,7 +5,7 @@
 
 | Field | Value |
 |---|---|
-| **Status** | In sync with v0.2.1 (draft period closed) |
+| **Status** | In sync with v0.2.2 (draft period closed) |
 | **Date** | 2026-09-09 (first draft) — last sync 2026-09-18 |
 | **Author** | (user) — original architecture design; Rust implementation plan by Mavis |
 | **Audience** | LLM harness developers, build-orchestration authors, agent users on projects with high build times |
@@ -940,6 +940,8 @@ Required minimum: **shell command + file read.** Both exist in all modern harnes
     exit code consistency, O_NOFOLLOW, dead code removal, P0/S1 patches.
 11. v0.2.1 (TASK-050/051): `exit.summary` — last ~2KB preview of `.out`
     (optional, cut at line boundary); additive, no breaking changes.
+12. v0.2.2 (TASK-053/054/055): Windows detach linger (`HBMON_DETACHED_CHILD`),
+    macOS UDS path helper, `serve_error` diagnosis; additive, no breaking changes.
 
 ---
 
@@ -952,4 +954,4 @@ Required minimum: **shell command + file read.** Both exist in all modern harnes
 
 ---
 
-**End of document. v0.1 Draft + v1/v2 MVP outcome notes (in sync with v0.2.1, TASK-031/047/048/050). Open for feedback and revision.**
+**End of document. v0.1 Draft + v1/v2 MVP outcome notes (in sync with v0.2.2, TASK-031/047/048/050/053/054). Open for feedback and revision.**
