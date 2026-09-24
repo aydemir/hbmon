@@ -934,7 +934,7 @@
   {
     "id": "TASK-055",
     "title": "v0.2.2 release (patch + binary + crates.io)",
-    "status": "todo",
+    "status": "done",
     "priority": "P1",
     "environment": "both",
     "labels": [
@@ -947,6 +947,6 @@
     ],
     "created": "2026-09-24",
     "updated": "2026-09-24",
-    "file": "tasks/TASK-055-v022-release.md"
+    "file": "tasks/done/TASK-055-v022-release.md"
   }
 ]
