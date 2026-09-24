@@ -716,6 +716,7 @@ oom-kill:constraint=CONSTRAINT_MEMCG,...
 | `health_change` | (şemada; v0.1.1'de emit edilmiyor — izdüşümü `status.state`) | `from`, `to` |
 | `timeout` | Timeout aşıldı | `elapsed_sec`, `limit_sec` |
 | `shutdown` | Daemon kapanıyor | `reason` |
+| `serve_error` | IPC serve/bind düştü (TASK-053; daemon kör koşmaz, tanı log'da kalır) | `error` |
 
 > `exit.summary` (TASK-050, opsiyonel): `.out`'un son ~2KB'ından satır
 > sınırında kesilmiş önizleme (budanmışsa başında `…`). Tüketici önce

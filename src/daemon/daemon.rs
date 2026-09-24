@@ -495,7 +495,7 @@ fn poll_once(ctx: &mut PollCtx, st: &mut Poll) -> bool {
 }
 
 pub fn run_daemon(cfg: MonitorConfig, linger: bool) -> Result<(), String> {
-    let logger = EventLogger::create(&cfg.log)?;
+    let logger = Arc::new(EventLogger::create(&cfg.log)?);
     let insp = inspector();
     let started_iso = now_iso();
     let started_secs = now_secs();
@@ -582,9 +582,23 @@ pub fn run_daemon(cfg: MonitorConfig, linger: bool) -> Result<(), String> {
         let shared = shared.clone();
         let logger_path = cfg.log.clone();
         let sock = cfg.sock.clone();
+        // TASK-053: `serve` hatası (`bind` dahil) eskiden `let _ =` ile
+        // yutuluyordu — daemon kör koşar, istemci 15 sn sonra "never came
+        // up" derdi (macOS UDS 104 bayt vakası). Hata `.jsonl`'a
+        // `serve_error` olayı olarak düşer; socket yokken bile log
+        // dosyası yerinde olduğundan tanı konur. Davranış değişmez
+        // (daemon yaşam döngüsü aynı).
+        let err_logger = logger.clone();
+        let err_uuid = cfg.uuid.clone();
         std::thread::spawn(move || {
             let handler = Arc::new(move |req: Value| dispatch(req, &shared, &logger_path));
-            let _ = crate::ipc::serve(&sock, handler);
+            if let Err(e) = crate::ipc::serve(&sock, handler) {
+                err_logger.append(&events::new_event(
+                    "serve_error",
+                    &err_uuid,
+                    events::kv(&[("error", json!(e))]),
+                ));
+            }
         });
     }
 
@@ -594,7 +608,7 @@ pub fn run_daemon(cfg: MonitorConfig, linger: bool) -> Result<(), String> {
 
     let mut ctx = PollCtx {
         shared: &shared,
-        logger: &logger,
+        logger: logger.as_ref(),
         cfg: &cfg,
         insp: &*insp,
         child: &mut child,

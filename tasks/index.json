@@ -900,6 +900,22 @@
     "file": "tasks/done/TASK-052-macos-clippy.md"
   },
   {
+    "id": "TASK-053",
+    "title": "macOS ignored sock yolu (UDS 104 bayt) + serve körlüğü",
+    "status": "todo",
+    "priority": "P1",
+    "environment": "macos",
+    "labels": [
+      "macos",
+      "tests",
+      "ci"
+    ],
+    "depends_on": [],
+    "created": "2026-09-24",
+    "updated": "2026-09-24",
+    "file": "tasks/TASK-053-macos-uds-path.md"
+  },
+  {
     "id": "TASK-054",
     "title": "Windows CI spawn borçları (7 entegrasyon testi: daemon never came up)",
     "status": "done",

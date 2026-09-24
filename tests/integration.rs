@@ -24,6 +24,25 @@ fn sock_for(id: &str) -> String {
     hbmon::platform::paths::sock_display(&hbmon::platform::paths::default_sock(id))
 }
 
+/// Hermetik dizin (TASK-053): `tempfile::tempdir()` macOS'te `$TMPDIR`
+/// (`/var/folders/.../T/`) altını kullanır; `--sock` ile birleşince macOS
+/// UDS sınırı (104 bayt) aşılır, `bind` düşer, daemon kör koşar
+/// (`wait_for_ready` 15 sn sonra patlar). Unix'te `/tmp` altında kısa
+/// dizin; Windows'ta varsayılan (named pipe dosya yolu değil, sınır yok).
+fn hermetic_dir() -> tempfile::TempDir {
+    #[cfg(unix)]
+    {
+        tempfile::Builder::new()
+            .prefix("hbmon-t")
+            .tempdir_in("/tmp")
+            .expect("hermetic dir under /tmp")
+    }
+    #[cfg(windows)]
+    {
+        tempfile::tempdir().expect("hermetic dir")
+    }
+}
+
 /// Platform uyku komutu: `["sleep","N"]` / powershell `Start-Sleep`.
 fn sleep_cmd(secs: u64) -> Vec<String> {
     #[cfg(unix)]
@@ -473,7 +492,7 @@ fn wait_until_unknown_signal_fails_fast() {
 fn list_shows_live_monitors_by_uuid() {
     // Hermetik: izole dizin + açık --sock (ortam /tmp kalabalığından
     // ve görünürlük yarışlarından etkilenmez).
-    let dir = tempfile::tempdir().unwrap();
+    let dir = hermetic_dir();
     let dir_s = dir.path().to_string_lossy().to_string();
     let ida = uuid("list-a");
     let idb = uuid("list-b");
@@ -500,6 +519,13 @@ fn list_shows_live_monitors_by_uuid() {
         .join(format!("hbmon-{}.jsonl", idb))
         .to_string_lossy()
         .to_string();
+    // TASK-053: unix UDS sınırı (macOS 104) aşılırsa bind düşer, daemon
+    // kör koşar — sessiz uzama yerine burada yüksek sesle düş.
+    #[cfg(unix)]
+    {
+        debug_assert!(sa.len() < 104, "sock yolu uzun: {}", sa);
+        debug_assert!(sb.len() < 104, "sock yolu uzun: {}", sb);
+    }
     for (id, sock, log, cmd) in [
         (&ida, sa.clone(), la.clone(), sleep_cmd(30)),
         (&idb, sb.clone(), lb.clone(), sleep_cmd(30)),
@@ -635,7 +661,7 @@ fn list_shows_live_monitors_by_uuid() {
 #[ignore = "proot sandbox: fresh files vanish from /tmp; runs on real kernels (CI + Windows box)"]
 fn cleanup_protects_live_daemon_files() {
     // Hermetik: izole dizin + açık --sock (ortam /tmp'sine dokunmaz).
-    let dir = tempfile::tempdir().unwrap();
+    let dir = hermetic_dir();
     let dir_s = dir.path().to_string_lossy().to_string();
     let id = uuid("cleanup-guard");
     // --sock gövdesi --uuid ile aynı (list/guard uuid'yi addan türetir),
@@ -651,6 +677,9 @@ fn cleanup_protects_live_daemon_files() {
         .join(format!("hbmon-{}.jsonl", id))
         .to_string_lossy()
         .to_string();
+    // TASK-053: unix UDS sınırı (macOS 104) — hermetic_dir kısa tutar.
+    #[cfg(unix)]
+    debug_assert!(sock.len() < 104, "sock yolu uzun: {}", sock);
     let mut args = vec![
         "watch".to_string(),
         "--detach".to_string(),

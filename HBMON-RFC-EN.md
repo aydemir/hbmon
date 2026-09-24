@@ -709,6 +709,7 @@ The `status` response contains these fields: `v`, `id`, `ok`, `state` (`running`
 | `health_change` | (in schema; not emitted in v0.1.1 — its projection is `status.state`) | `from`, `to` |
 | `timeout` | Timeout exceeded | `elapsed_sec`, `limit_sec` |
 | `shutdown` | Daemon shutting down | `reason` |
+| `serve_error` | IPC serve/bind failed (TASK-053; daemon never runs blind, diagnosis stays in the log) | `error` |
 
 > `exit.summary` (TASK-050, optional): preview cut at a line boundary from
 > the last ~2KB of `.out` (leading `…` when trimmed). Consumers read the
